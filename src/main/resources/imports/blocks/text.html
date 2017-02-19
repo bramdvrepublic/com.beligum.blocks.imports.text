@@ -1,20 +1,19 @@
-<meta property="blocks:title" content="Text" lang="en">
-<meta property="blocks:title" content="Tekst" lang="nl">
-
-<meta property="blocks:description" content="A block that will contain text" lang="en">
-<meta property="blocks:description" content="A blok dat tekst kan bevatten" lang="nl">
-
+<meta property="blocks:title" content="$MESSAGES.blocks.imports.text.blockTitle">
+<meta property="blocks:description" content="$MESSAGES.blocks.imports.text.blockDescription">
 <meta property="blocks:icon" content="fa-bold">
 
+## PUBLIC STYLES
 <link href="/assets/styles/imports/blocks-text.less" rel="stylesheet"/>
 
+## ADMIN LIBS
 <script src="/assets/webjars/medium-editor/5.14.4/dist/js/medium-editor.js" type="application/javascript" data-scope-role="admin"></script>
 <script src="/assets/scripts/imports/blocks-text/medium/medium-styles-extension.js" type="application/javascript" data-scope-role="admin"></script>
 <script src="/assets/scripts/imports/blocks-text/medium/mediumModule.js" type="application/javascript" data-scope-role="admin"></script>
 
+## ADMIN SCRIPTS
+<script src="/constants/blocks/imports/text?type=js" type="application/javascript" data-scope-role="admin"></script>
+<script src="/messages/blocks/imports/text?type=js" type="application/javascript" data-scope-role="admin"></script>
 <script src="/assets/scripts/imports/blocks-text.js" type="application/javascript" data-scope-role="admin"></script>
-<script src="/assets/scripts/imports/text.js" type="application/javascript" data-scope-role="admin"></script>
-## Note: this relies on the Medium editor js
 <script src="/assets/scripts/imports/blocks-text/styles.js" type="application/javascript" data-scope-role="admin"></script>
 
 <template>
