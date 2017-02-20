@@ -5,7 +5,7 @@
  * Created by wouter on 17/07/15.
  */
 
-base.plugin("blocks.core.MediumEditorStyles", ["messages.blocks.imports.text", function (TextMessages)
+base.plugin("blocks.core.TextStyles", ["messages.blocks.imports.text", function (TextMessages)
 {
     //-----EDITOR STYLES-----
     //possible it's not loaded (eg. because the block wasn't used in the page)
