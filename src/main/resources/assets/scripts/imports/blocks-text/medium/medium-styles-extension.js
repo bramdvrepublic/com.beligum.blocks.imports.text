@@ -2,11 +2,9 @@
  * Created by wouter on 8/07/15.
  */
 
-base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.imports.Widget", "blocks.core.Sidebar", "base.core.Commons", "constants.blocks.imports.text", function (Class, Widget, Sidebar, Commons, TextConstants)
+base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.imports.Widget", "blocks.core.Sidebar", "base.core.Commons", "messages.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Widget, Sidebar, Commons, BlocksMessages, TextConstants, TextMessages)
 {
     var MediumEditorExtensions = this;
-
-    this.ID_PREFIX = "medium-editor-";
 
     //extends the dest object with all the properties in source and returns dest
     var extendOptions = function (dest, source)
@@ -356,16 +354,22 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.im
         },
 
         //-----OVERLOADED FUNCTIONS-----
+        /**
+         * See medium_editor.js AnchorForm.getTemplate() for a HTML reference
+         */
         createForm: function ()
         {
-            var form = $('<div id="' + ('medium-editor-toolbar-form-anchor-' + this.getEditorId()) + '" class="form-inline medium-editor-toolbar-form"></div>');
+            var form = $('<div id="' + ('medium-editor-toolbar-form-anchor-' + this.getEditorId()) + '" class="form medium-editor-toolbar-form"></div>');
+
+            //this will contain the input, checkboxes, etc, but not the buttons
+            var formWidgets = $('<div class="' + TextConstants.EDITOR_ANCHOR_FORM_WIDGETS_CLASS + '"></div>').appendTo(form);
 
             //TODO this is a fast hack to make the createTextInput() method below work cause we're not subclassing from Widget
             var dummyWidget = new Widget.Class();
 
             //var inputActions = this.buildInputActions(Sidebar, true, true, null);
             //TODO add the inputActions to the constructor below, but make it work with the sidebar finder
-            var formGroup = dummyWidget.createTextInput(Sidebar,
+            var linkInput = dummyWidget.createTextInput(Sidebar,
                 function getterFunction()
                 {
                     //return element.attr(attribute);
@@ -374,10 +378,44 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.im
                 {
                     //return element.attr(attribute, val);
                 },
-                null, this.placeholderText, false, null).appendTo(form);
+                null, this.placeholderText, false, null)
+                .appendTo(formWidgets);
 
-            var okBtn = $('<a class="btn btn-primary ' + this.confirmBtnClass + '"><i class="fa fa-check"></i></a>').appendTo(form);
-            var cancelBtn = $('<a class="btn btn-link" class="' + this.cancelBtnClass + '">cancel</a>').appendTo(form);
+            linkInput.find('input').addClass('medium-editor-toolbar-input');
+
+            var targetToggle = dummyWidget.createToggleButton(TextMessages.linkTargetLabel,
+                function initStateCallback()
+                {
+                    // var retVal = element.parent(LINK_SELECTOR).length > 0;
+                    //
+                    // if (retVal) {
+                    //     startState = true;
+                    // }
+                    //
+                    // return retVal;
+                },
+
+                function switchStateCallback(oldState, newState)
+                {
+                    // if (newState) {
+                    //     element.wrap(wrapLink);
+                    //     addInputForm();
+                    // } else {
+                    //     //this parent-child iteration ensures we have a <a> parent
+                    //     element.parent(LINK_SELECTOR).children().unwrap();
+                    //     removeInputForm();
+                    // }
+                },
+                BlocksMessages.toggleLabelYes,
+                BlocksMessages.toggleLabelNo)
+                .appendTo(formWidgets);
+
+            targetToggle.find('input').addClass('medium-editor-toolbar-anchor-target');
+
+            var formControls = $('<div class="' + TextConstants.EDITOR_ANCHOR_FORM_CONTROLS_CLASS + '"></div>').appendTo(form);
+
+            var okBtn = $('<a class="btn btn-sm btn-primary medium-editor-toolbar-save ' + this.confirmBtnClass + '"><i class="fa fa-check"></i> ' + TextMessages.linkControlApply + '</a>').appendTo(formControls);
+            var cancelBtn = $('<a class="btn btn-link medium-editor-toolbar-close ' + this.cancelBtnClass + '"><i class="fa fa-close"></i></a>').appendTo(formControls);
 
             okBtn.click(this.handleSaveClick.bind(this));
             cancelBtn.click(this.handleCloseClick.bind(this));
