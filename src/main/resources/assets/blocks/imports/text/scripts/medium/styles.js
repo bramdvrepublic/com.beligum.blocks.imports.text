@@ -267,10 +267,12 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.im
                     }
                 }
 
-                var index = $.inArray(selected[0], filteredNative);
-                if (index < 0) {
-                    filteredNative.push(selected[0]);
-                    filtered.push(selected);
+                if (selected) {
+                    var index = $.inArray(selected[0], filteredNative);
+                    if (index < 0) {
+                        filteredNative.push(selected[0]);
+                        filtered.push(selected);
+                    }
                 }
             }
 
