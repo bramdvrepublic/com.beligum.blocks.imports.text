@@ -25,7 +25,7 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
 
     //default values, overridable
     var toolbarButtons = [Extensions.StylesPicker.NAME, 'bold', 'italic', 'underline', 'strike-through', 'superscript', Extensions.LinkInput.NAME, 'orderedlist', 'unorderedlist', 'justifyLeft', 'justifyCenter', 'justifyRight', 'removeFormat'];
-    var toolbarButtonsInline = ['bold', 'italic', 'underline', 'superscript', 'removeFormat'];
+    var toolbarButtonsInline = ['bold', 'italic', 'underline', 'superscript', Extensions.LinkInput.NAME, 'justifyLeft', 'justifyCenter', 'justifyRight', 'removeFormat'];
 
     var stylePickerStyles = [];
     var toolbarOptions = {};

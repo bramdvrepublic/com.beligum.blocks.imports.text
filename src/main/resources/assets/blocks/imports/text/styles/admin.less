@@ -30,8 +30,11 @@
 @import (reference) "/assets/webjars/bootstrap/3.3.4/less/mixins/text-emphasis.less";
 @import (reference) "/assets/webjars/bootstrap/3.3.4/less/mixins/background-variant.less";
 @import (reference) "/assets/webjars/less-elements/1.0.0/elements.less";
+@import (reference) "/assets/webjars/bootstrap/3.3.4/less/mixins.less";
+@import (reference) "/assets/webjars/bootstrap/3.3.4/less/utilities.less";
 
 @import (reference) "/assets/blocks/core/styles/mixins.less";
+@import (reference) "/constants/blocks/core?type=less";
 @import (reference) "/constants/blocks/imports/text?type=less";
 
 //-----STYLES-----
@@ -70,7 +73,19 @@
   }
 }
 
-//-----MEDIUM EDITOR-----
+//blocks-text div[contentEditable=true]:empty:not(:focus):before{
+//blocks-text div:empty:before,
+//blocks-text div p:empty:before,
+//blocks-text div p:only-child:before,
+blocks-text div p:only-child br:only-child:before {
+  //content: attr(data-placeholder);
+  //display: block;
+  //content: 'blah';
+  content: "(empty)" !important;
+  display: block !important;
+}
+
+//-----MEDIUM EDITOR STYLES-----
 .medium-editor-placeholder {
   position: relative;
 
@@ -166,21 +181,35 @@
   }
 
   .@{EDITOR_ANCHOR_FORM_CONTROLS_CLASS} {
+
     padding-left: @halfGutter;
+    vertical-align: bottom;
 
+    .medium-editor-toolbar-open,
+    .medium-editor-toolbar-delete,
     .medium-editor-toolbar-save {
-      //to make it pixel perfect, don't know why it's not aligned right
-      position: relative;
-      bottom: -2.5px;
+      display: block;
     }
-    .medium-editor-toolbar-close {
-      .close();
 
-      font-size: 1.2em;
-      position: absolute;
-      top: 0px;
-      right: 0px;
+    // Note: these two below didn't exist in vanilla medium editor,
+    // we added them with the same naming for consistency
+    .medium-editor-toolbar-delete {
+
     }
+    .medium-editor-toolbar-open {
+
+    }
+  }
+
+  //we pulled this one out of the container because
+  //it's up there and has nothing to do with the rest
+  .medium-editor-toolbar-close {
+    .close();
+
+    font-size: 1.2em;
+    position: absolute;
+    top: 0px;
+    right: 0px;
   }
 
   //makes sure the form doesn't grow when the inline buttons are shown (little css bug to fix)
@@ -192,4 +221,32 @@
     .inline-input-buttons();
     width: @inputWidth;
   }
+
+
+
+  //A bit of code from the sidebar to make the inlining work a bit better
+  .dropdown,
+  .checkbox,
+  .@{RADIO_GROUP_CLASS},
+  .@{COLOR_GROUP_CLASS},
+  .@{TOGGLE_GROUP_CLASS},
+  .list-group {
+    text-align: right;
+    .pull-right();
+
+    //this is needed so there's no animation happening
+    // after presenting the form for the first time
+    &.@{TOGGLE_GROUP_CLASS} {
+      .toggle-group {
+        //invented this value, only used once, if more, convert to constant
+        &.@{LINK_TOGGLE_NO_ANIM_CLASS} {
+          .transition(none);
+        }
+      }
+    }
+  }
+
+}
+.medium-editor-toolbar-form-active {
+  display: block;
 }

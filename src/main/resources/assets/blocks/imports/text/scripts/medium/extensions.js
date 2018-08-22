@@ -18,7 +18,7 @@
  * Created by wouter on 8/07/15.
  */
 
-base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.imports.Widget", "blocks.core.Sidebar", "base.core.Commons", "messages.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Widget, Sidebar, Commons, BlocksMessages, TextConstants, TextMessages)
+base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.core.Notification", "blocks.imports.Widget", "blocks.core.Sidebar", "base.core.Commons", "messages.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Notification, Widget, Sidebar, Commons, BlocksMessages, TextConstants, TextMessages)
 {
     var MediumEditorExtensions = this;
 
@@ -359,6 +359,10 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.im
             NAME: "link-input"
         },
 
+        //-----VARIABLES-----
+        linkElement: null,
+        //reset: see constructor
+
         //-----CONSTRUCTORS-----
         constructor: function (options)
         {
@@ -369,9 +373,106 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.im
             this.cssPrefix = this.name + '-';
             this.confirmBtnClass = this.cssPrefix + 'confirm';
             this.cancelBtnClass = this.cssPrefix + 'cancel';
+            // Note: these two below didn't exist in vanilla medium editor,
+            // we added them with the same naming for consistency
+            this.openBtnClass = this.cssPrefix + 'open';
+            this.deleteBtnClass = this.cssPrefix + 'delete';
         },
 
         //-----OVERLOADED FUNCTIONS-----
+        // Called when the button the toolbar is clicked
+        handleClick: function (event)
+        {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var range = MediumEditor.selection.getSelectionRange(this.document);
+
+            var opts = undefined;
+            if (range.startContainer.nodeName.toLowerCase() === 'a' ||
+                range.endContainer.nodeName.toLowerCase() === 'a' ||
+                MediumEditor.util.getClosestTag(MediumEditor.selection.getSelectedParentElement(range), 'a')) {
+
+                //switch for old/new style
+                if (true) {
+                    var rawLinkEl = MediumEditor.selection.getSelectedParentElement(range);
+                    //it's possible the caret is just inside the link, make sure we select it all,
+                    //or a new <a> will get inserted at the caret's position instead of replacing the
+                    //entire link's href
+                    this.base.selectElement(rawLinkEl);
+
+                    this.linkElement = $(rawLinkEl);
+                    opts = {
+                        value: this.linkElement.attr('href'),
+                        target: this.linkElement.attr('target')
+                    };
+                }
+                else {
+                    //this was the old behavior
+                    //return this.execAction('unlink');
+                }
+            }
+
+            if (!this.isDisplayed()) {
+                this.showForm(opts);
+            }
+
+            return false;
+        },
+
+        hideForm: function ()
+        {
+            MediumEditorExtensions.LinkInput.Super.prototype.hideForm.call(this);
+        },
+
+        showForm: function (opts)
+        {
+            //don't let the toggle changes get animated, it's weird when showing the panel for the first time
+            this.setAnchorTargetAnimation(false);
+
+            MediumEditorExtensions.LinkInput.Super.prototype.showForm.call(this, opts);
+
+            //we need to call this because the parent method sets it, but doens't trigger the UI change
+            $(this.getAnchorTargetCheckbox()).change();
+
+            //after the timer for the (disabled) animation of the toggle is done,
+            //it's nice to re-activate it for the user
+            var that = this;
+            setTimeout(function ()
+            {
+                that.setAnchorTargetAnimation(true)
+            }, 500);
+
+            var that = this;
+            var openBtn = $(this.getForm().querySelector('.'+this.openBtnClass));
+            openBtn.off('click');
+            openBtn.click(function (e)
+            {
+                //this is for the 'live' link
+                //var link = $(that.getInput()).val();
+
+                var link = that.linkElement.attr('href');
+                if (link) {
+                    window.open(link, '_blank');
+                }
+                else {
+                    Notification.warn(TextMessages.invalidLinkWarning);
+                }
+            });
+
+            var deleteBtn = $(this.getForm().querySelector('.'+this.deleteBtnClass));
+            deleteBtn.off('click');
+            deleteBtn.click(function (e)
+            {
+                //this native method seemed buggy, replaced with jquery variant
+                //that.execAction('unlink');
+
+                that.linkElement.replaceWith(that.linkElement.text());
+                //Note: we can't save it, or the current input value will be used
+                that.doFormCancel();
+            });
+        },
+
         /**
          * See medium_editor.js AnchorForm.getTemplate() for a HTML reference
          */
@@ -431,19 +532,41 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.im
             targetToggle.find('input').addClass('medium-editor-toolbar-anchor-target');
 
             var formControls = $('<div class="' + TextConstants.EDITOR_ANCHOR_FORM_CONTROLS_CLASS + '"></div>').appendTo(form);
-
-            var okBtn = $('<a class="btn btn-sm btn-primary medium-editor-toolbar-save ' + this.confirmBtnClass + '"><i class="fa fa-check"></i> ' + TextMessages.linkControlApply + '</a>').appendTo(formControls);
-            var cancelBtn = $('<a class="btn btn-link medium-editor-toolbar-close ' + this.cancelBtnClass + '"><i class="fa fa-close"></i></a>').appendTo(formControls);
+            var btnGroup = $('<div class="btn-group"></div>').appendTo(formControls);
+            var okBtn = $('<button type="button" class="btn btn-md btn-primary medium-editor-toolbar-save ' + this.confirmBtnClass + '"><i class="fa fa-check"></i></button>').appendTo(btnGroup);
+            var caret = $('<button type="button" class="btn btn-md btn-primary dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></button>').appendTo(btnGroup);
+            var actionsMenu = $('<ul class="dropdown-menu"></ul>').appendTo(btnGroup);
+            var openBtn = $('<li><a href="javascript:void(0)" data-role="force" class="' + this.openBtnClass + '">' + TextMessages.linkControlOpen + '</a></li>').appendTo(actionsMenu);
+            var deleteBtn = $('<li><a href="javascript:void(0)" class="' + this.deleteBtnClass + '">' + TextMessages.linkControlDelete + '</a></li>').appendTo(actionsMenu);
 
             okBtn.click(this.handleSaveClick.bind(this));
+            //Note: the two other buttons are set in the showForm() method
+
+            var cancelBtn = $('<a class="btn btn-link medium-editor-toolbar-close ' + this.cancelBtnClass + '"><i class="fa fa-close"></i></a>').appendTo(form);
             cancelBtn.click(this.handleCloseClick.bind(this));
 
             return form.get(0);
         },
         getInput: function ()
         {
-            return this.getForm().querySelector('input');
+            return this.getForm().querySelector('input.medium-editor-toolbar-input');
         },
+        getAnchorTargetCheckbox: function ()
+        {
+            return this.getForm().querySelector('input.medium-editor-toolbar-anchor-target');
+        },
+        setAnchorTargetAnimation: function (enableAnimation)
+        {
+            var toggleGroup = $(this.getAnchorTargetCheckbox()).parent().find('.toggle-group');
+
+            if (enableAnimation) {
+                toggleGroup.removeClass(TextConstants.LINK_TOGGLE_NO_ANIM_CLASS);
+            }
+            else {
+                toggleGroup.addClass(TextConstants.LINK_TOGGLE_NO_ANIM_CLASS);
+            }
+        }
+
 
         //-----OWN FUNCTIONS-----
 

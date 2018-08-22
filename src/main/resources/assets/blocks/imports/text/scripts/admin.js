@@ -43,28 +43,60 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
 
             var inlineEditor = element.prop('tagName') == 'SPAN';
 
-            //this allows us to set some specific additional options to the elements to control how the editor behaves
-            var options = {};
-            var optionsAttr = element.attr(TextConstants.OPTIONS_ATTR);
-            if (optionsAttr) {
-                //this converts and array to an object
-                var optionsAttrValues = optionsAttr.split(" ");
-                for (var i = 0; i < optionsAttrValues.length; i++) {
-                    var option = optionsAttrValues[i];
-                    //special flag to force the inline editor, no matter the tag
-                    if (option == TextConstants.OPTIONS_FORCE_INLINE) {
-                        inlineEditor = true;
-                    }
-                    else {
-                        //for now, we don't have values, so just set to true
-                        //note that code (eg the constuctor in mediumModule.js) depends on this to be true
-                        options[option] = true;
+            // This is a bit tricky and needs more info:
+            // when implementing the data-editor-options feature, it was meanly meant to put on random elements (eg. div and span)
+            // that we could then "activate" by attaching the inline editor to (eg. see the blocks-imports-carousel project).
+            // We could then easily put some attributes on those elements to control what kind of editor was instantiated.
+            // But, it also makes sense (and feels natural) to put those options directly on <blocks-text> elements,
+            // and expect them to instantiate a correct editor, based on those options.
+            // However, the "element" object here ('here', meaning in a standard blocks-text object) is not the <blocks-text>
+            // element, but it's child property-container element <div property="text">.
+            // So if we want to be able to serve both uses (using this code attached to a blocks-text and to a regular div),
+            // we'll have to implement a little workaround to check if the parent is a blocks-text and also incorporate
+            // the option-attributes on that element.
+            // Of course, as usual, the more down the DOM, the more important, so we allow for option-overriding of parent-element options.
+
+            var elements = [];
+
+            //if the parent is a blocks-text, append it to the list of elements to be inspected for options
+            var parent = element.parent();
+            if (parent && parent.prop('tagName') == 'BLOCKS-TEXT') {
+                elements.push(parent);
+            }
+
+            //lastly, add the most important element, the 'legacy' one (the one that can override all previous)
+            elements.push(element);
+
+            for (var i=0;i<elements.length;i++) {
+                var e = elements[i];
+
+                //this allows us to set some specific additional options to the elements to control how the editor behaves
+                var options = {};
+                var optionsAttr = e.attr(TextConstants.OPTIONS_ATTR);
+                if (optionsAttr) {
+                    //this converts and array to an object
+                    var optionsAttrValues = optionsAttr.split(" ");
+                    for (var i = 0; i < optionsAttrValues.length; i++) {
+                        var option = optionsAttrValues[i];
+                        //special flag to force the inline editor, no matter the tag
+                        if (option == TextConstants.OPTIONS_FORCE_INLINE) {
+                            inlineEditor = true;
+                        }
+                        else {
+                            //for now, we don't have values, so just set to true
+                            //note that code (eg the constuctor in mediumModule.js) depends on this to be true
+                            options[option] = true;
+                        }
                     }
                 }
             }
 
-            // last argument means inline (no enter allowed) or not
             var editor = Editor.getEditor(element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR]);
+
+            editor.subscribe('editableInput', function (event, editorElement) {
+                Logger.info(event);
+            });
+
             this._setCursor(hotspot.left, hotspot.top);
 
             // Add toolbar to sidebar
@@ -78,6 +110,11 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
         blur: function (block, element)
         {
             Text.Class.Super.prototype.blur.call(this, block, element);
+
+            Logger.info("BLUR: '"+element.text()+"'");
+            if ($.trim(element.text())=='') {
+                Logger.info("EMPTY");
+            }
 
             Editor.removeEditor(element);
             element.removeAttr("contenteditable");
