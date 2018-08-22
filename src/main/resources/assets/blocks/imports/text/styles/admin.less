@@ -73,31 +73,20 @@
   }
 }
 
-//blocks-text div[contentEditable=true]:empty:not(:focus):before{
-//blocks-text div:empty:before,
-//blocks-text div p:empty:before,
-//blocks-text div p:only-child:before,
-blocks-text div p:only-child br:only-child:before {
-  //content: attr(data-placeholder);
-  //display: block;
-  //content: 'blah';
-  content: "(empty)" !important;
-  display: block !important;
-}
-
 //-----MEDIUM EDITOR STYLES-----
-.medium-editor-placeholder {
-  position: relative;
-
-  &:after {
-    content: attr(data-placeholder) !important;
-    font-style: italic;
-    left: 0;
-    position: absolute;
-    top: 0;
-    white-space: pre;
-  }
-}
+//disabled, now implemented in main.less
+//.medium-editor-placeholder {
+//  position: relative;
+//
+//  &:after {
+//    content: attr(data-placeholder) !important;
+//    font-style: italic;
+//    left: 0;
+//    position: absolute;
+//    top: 0;
+//    white-space: pre;
+//  }
+//}
 
 .medium-editor-toolbar {
   position: absolute;
@@ -181,24 +170,8 @@ blocks-text div p:only-child br:only-child:before {
   }
 
   .@{EDITOR_ANCHOR_FORM_CONTROLS_CLASS} {
-
     padding-left: @halfGutter;
     vertical-align: bottom;
-
-    .medium-editor-toolbar-open,
-    .medium-editor-toolbar-delete,
-    .medium-editor-toolbar-save {
-      display: block;
-    }
-
-    // Note: these two below didn't exist in vanilla medium editor,
-    // we added them with the same naming for consistency
-    .medium-editor-toolbar-delete {
-
-    }
-    .medium-editor-toolbar-open {
-
-    }
   }
 
   //we pulled this one out of the container because
@@ -221,8 +194,6 @@ blocks-text div p:only-child br:only-child:before {
     .inline-input-buttons();
     width: @inputWidth;
   }
-
-
 
   //A bit of code from the sidebar to make the inlining work a bit better
   .dropdown,

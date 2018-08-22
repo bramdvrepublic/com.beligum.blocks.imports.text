@@ -89,6 +89,8 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         }
 
         options.disableReturn = inline;
+        //we implemented our own to get around some limitations, see admin.js for details
+        options.disablePlaceholders = true;
 
         mediumEditor = new MediumEditor(element[0], options);
 

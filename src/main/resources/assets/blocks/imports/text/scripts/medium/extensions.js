@@ -373,8 +373,6 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             this.cssPrefix = this.name + '-';
             this.confirmBtnClass = this.cssPrefix + 'confirm';
             this.cancelBtnClass = this.cssPrefix + 'cancel';
-            // Note: these two below didn't exist in vanilla medium editor,
-            // we added them with the same naming for consistency
             this.openBtnClass = this.cssPrefix + 'open';
             this.deleteBtnClass = this.cssPrefix + 'delete';
         },
@@ -388,7 +386,10 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             var range = MediumEditor.selection.getSelectionRange(this.document);
 
+            //reset the vars
             var opts = undefined;
+            this.linkElement = null;
+
             if (range.startContainer.nodeName.toLowerCase() === 'a' ||
                 range.endContainer.nodeName.toLowerCase() === 'a' ||
                 MediumEditor.util.getClosestTag(MediumEditor.selection.getSelectedParentElement(range), 'a')) {
@@ -401,15 +402,18 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     //entire link's href
                     this.base.selectElement(rawLinkEl);
 
+                    //save the link for later on
                     this.linkElement = $(rawLinkEl);
+                    var href = this.linkElement.attr('href');
+                    var target = this.linkElement.attr('target');
                     opts = {
-                        value: this.linkElement.attr('href'),
-                        target: this.linkElement.attr('target')
+                        value: href ? href : null,
+                        target: target
                     };
                 }
                 else {
                     //this was the old behavior
-                    //return this.execAction('unlink');
+                    return this.execAction('unlink');
                 }
             }
 
@@ -443,34 +447,63 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 that.setAnchorTargetAnimation(true)
             }, 500);
 
-            var that = this;
-            var openBtn = $(this.getForm().querySelector('.'+this.openBtnClass));
-            openBtn.off('click');
-            openBtn.click(function (e)
-            {
-                //this is for the 'live' link
-                //var link = $(that.getInput()).val();
+            //make sure we start from scratch
+            var btnGroup = $(this.getForm().querySelector('.btn-group'));
+            btnGroup.empty();
 
-                var link = that.linkElement.attr('href');
+            //first of all, we add the save button
+            var okBtn = $('<button type="button" class="btn btn-md btn-primary medium-editor-toolbar-save ' + this.confirmBtnClass + '"><i class="fa fa-check"></i></button>').appendTo(btnGroup);
+            //note that this won't do anything if the value of the input field is not set
+            //sometimes, it's a bit counter-intuitive, but what the hell, it's only a minor thing
+            //and I didn't want to re-write the whole createLink() method
+            okBtn.click(this.handleSaveClick.bind(this));
+
+            //if we don't have a link (this is the first time the panel gets launched),
+            //don't show the advanced buttons because they don't make any sense
+            if (this.linkElement) {
+
+                var that = this;
+                var link = this.linkElement.attr('href');
+
+                var openBtn = null;
                 if (link) {
-                    window.open(link, '_blank');
+                    openBtn = $('<li><a href="javascript:void(0)" data-role="force" class="' + this.openBtnClass + '">' + TextMessages.linkControlOpen + '</a></li>');
+                    openBtn.click(function (e)
+                    {
+                        //this is for the 'live' link
+                        //var link = $(that.getInput()).val();
+                        if (link) {
+                            window.open(link, '_blank');
+                        }
+                        else {
+                            Notification.warn(TextMessages.invalidLinkWarning);
+                        }
+                    });
                 }
-                else {
-                    Notification.warn(TextMessages.invalidLinkWarning);
+
+                var deleteBtn = $('<li><a href="javascript:void(0)" class="' + this.deleteBtnClass + '">' + TextMessages.linkControlDelete + '</a></li>');
+                deleteBtn.click(function (e)
+                {
+                    //this native method seemed buggy, replaced with jquery variant
+                    //that.execAction('unlink');
+
+                    that.linkElement.replaceWith(that.linkElement.text());
+                    //Note: we can't save it, or the current input value will be used
+                    that.doFormCancel();
+                });
+
+                //only add complex UI when needed
+                if (openBtn || deleteBtn) {
+                    var toggleBtn = $('<button type="button" class="btn btn-md btn-primary dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></button>').appendTo(btnGroup);
+                    var actionsMenu = $('<ul class="dropdown-menu"></ul>').appendTo(btnGroup);
+                    if (openBtn) {
+                        openBtn.appendTo(actionsMenu);
+                    }
+                    if (deleteBtn) {
+                        deleteBtn.appendTo(actionsMenu);
+                    }
                 }
-            });
-
-            var deleteBtn = $(this.getForm().querySelector('.'+this.deleteBtnClass));
-            deleteBtn.off('click');
-            deleteBtn.click(function (e)
-            {
-                //this native method seemed buggy, replaced with jquery variant
-                //that.execAction('unlink');
-
-                that.linkElement.replaceWith(that.linkElement.text());
-                //Note: we can't save it, or the current input value will be used
-                that.doFormCancel();
-            });
+            }
         },
 
         /**
@@ -533,14 +566,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             var formControls = $('<div class="' + TextConstants.EDITOR_ANCHOR_FORM_CONTROLS_CLASS + '"></div>').appendTo(form);
             var btnGroup = $('<div class="btn-group"></div>').appendTo(formControls);
-            var okBtn = $('<button type="button" class="btn btn-md btn-primary medium-editor-toolbar-save ' + this.confirmBtnClass + '"><i class="fa fa-check"></i></button>').appendTo(btnGroup);
-            var caret = $('<button type="button" class="btn btn-md btn-primary dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></button>').appendTo(btnGroup);
-            var actionsMenu = $('<ul class="dropdown-menu"></ul>').appendTo(btnGroup);
-            var openBtn = $('<li><a href="javascript:void(0)" data-role="force" class="' + this.openBtnClass + '">' + TextMessages.linkControlOpen + '</a></li>').appendTo(actionsMenu);
-            var deleteBtn = $('<li><a href="javascript:void(0)" class="' + this.deleteBtnClass + '">' + TextMessages.linkControlDelete + '</a></li>').appendTo(actionsMenu);
-
-            okBtn.click(this.handleSaveClick.bind(this));
-            //Note: the two other buttons are set in the showForm() method
+            //Note: the buttons are set in the showForm() method
 
             var cancelBtn = $('<a class="btn btn-link medium-editor-toolbar-close ' + this.cancelBtnClass + '"><i class="fa fa-close"></i></a>').appendTo(form);
             cancelBtn.click(this.handleCloseClick.bind(this));

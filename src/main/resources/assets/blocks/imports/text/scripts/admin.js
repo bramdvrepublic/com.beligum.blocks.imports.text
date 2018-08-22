@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Property, Sidebar, Editor, BlocksConstants, TextConstants, TextMessages)
+base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
 {
     var Text = this;
     this.TAGS = ["blocks-text div", "blocks-text span"];
@@ -67,7 +67,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
             //lastly, add the most important element, the 'legacy' one (the one that can override all previous)
             elements.push(element);
 
-            for (var i=0;i<elements.length;i++) {
+            for (var i = 0; i < elements.length; i++) {
                 var e = elements[i];
 
                 //this allows us to set some specific additional options to the elements to control how the editor behaves
@@ -93,10 +93,39 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
 
             var editor = Editor.getEditor(element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR]);
 
-            editor.subscribe('editableInput', function (event, editorElement) {
-                Logger.info(event);
-            });
+            //Instead of relying on the standard placeholder functionality, we decided to implement our own:
+            // The main problem is that Medium Editor activates the class medium-editor-placeholder on the editor element
+            // when it decides the element is empty. In reality, it has a '<p><br><p>' content (or eg. a '<h1><br></h2>', depending
+            // on how it was emptied), and we don't have any means to detect this is css.
+            // Actually we _can_ detect (and put the placeholder) it,
+            // eg. with:
+            // blocks-text div p:only-child br:only-child:before {
+            //   content: attr(data-placeholder) !important;
+            //   display: block !important;
+            // }
+            // But because of that last <br> (and because it's a <br>), this doesn't work because <br> doesn't like to be styled.
+            // Also, there doesn't seem to be an :empty pseudo-selector (although mozilla want it https://developer.mozilla.org/en-US/docs/Web/CSS/:empty)
+            //
+            // Therefore, to be more flexible, we decided to implement a simple DIY solution with the code below,
+            // that sets a permanent class on empty elements, so we can also use this in functionality on non-admin
+            // pages (eg. when the editor saves a page with no content).
+            //
+            // The rest of this is implemented in main.less
+            var updatePlaceholder = function (event, rawEditorElement)
+            {
+                if ($.trim(element.text()) == '') {
+                    element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
+                }
+                else {
+                    element.removeClass(ImportsConstants.COMMONS_EMPTY_CLASS);
+                }
+            };
+            //this will receive all editor keystrokes
+            editor.subscribe('editableInput', updatePlaceholder);
+            editor.subscribe('focus', updatePlaceholder);
+            editor.subscribe('blur', updatePlaceholder);
 
+            //put the cursor where we clicked
             this._setCursor(hotspot.left, hotspot.top);
 
             // Add toolbar to sidebar
@@ -110,11 +139,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
         blur: function (block, element)
         {
             Text.Class.Super.prototype.blur.call(this, block, element);
-
-            Logger.info("BLUR: '"+element.text()+"'");
-            if ($.trim(element.text())=='') {
-                Logger.info("EMPTY");
-            }
 
             Editor.removeEditor(element);
             element.removeAttr("contenteditable");
