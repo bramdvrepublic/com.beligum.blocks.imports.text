@@ -19,19 +19,30 @@
 @import (reference) "/constants/blocks/imports/commons?type=less";
 @import (reference) "/messages/blocks/imports/text?type=less";
 @import (reference) "/assets/webjars/less-elements/1.0.0/elements.less";
+@import (reference) "/assets/webjars/bootstrap/3.3.4/less/variables.less";
 
 //-----STYLES-----
 //for now, we'll only do this for true blocks-text elements,
 //but know that eg. blocks-carousel uses regular divs and spans with this class...
 blocks-text {
+
   .@{COMMONS_EMPTY_CLASS} {
+    //for the absolute below
     position: relative;
+
+    //this is needed to pull open the parent for the content below
+    // if we're dealing with an inline (eg. span) element
+    display: inline-block;
+    min-height: @line-height-computed;
+
     &:after {
       position: absolute;
       top: 0;
       left: 0;
+
       content: '@{emptyContentPlaceholder}' !important;
       white-space: pre;
+
       .opacity(0.65);
     }
   }

@@ -93,12 +93,18 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
 
             var editor = Editor.getEditor(element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR]);
 
-            //Instead of relying on the standard placeholder functionality, we decided to implement our own:
+            // Instead of relying on the standard placeholder functionality, we decided to implement our own:
             // The main problem is that Medium Editor activates the class medium-editor-placeholder on the editor element
             // when it decides the element is empty. In reality, it has a '<p><br><p>' content (or eg. a '<h1><br></h2>', depending
-            // on how it was emptied), and we don't have any means to detect this is css.
-            // Actually we _can_ detect (and put the placeholder) it,
-            // eg. with:
+            // on how it was emptied) for a <div> and is only empty for a <span>, and we don't have any means to detect this is css (the <div> case).
+            //
+            // Note that this is default behavior and is controlled by the browser, not Medium Editor: the browser adds the <br>,
+            // Medium adds the <p> around it (as it uses the <p> tag as the last-man-standing tag for content).
+            // These are good reads too:
+            // https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Editable_content
+            // https://stackoverflow.com/questions/14638887/br-is-inserted-into-contenteditable-html-element-if-left-empty
+            //
+            // Actually we _can_ detect (and put the placeholder) it, eg. with:
             // blocks-text div p:only-child br:only-child:before {
             //   content: attr(data-placeholder) !important;
             //   display: block !important;
@@ -106,21 +112,28 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
             // But because of that last <br> (and because it's a <br>), this doesn't work because <br> doesn't like to be styled.
             // Also, there doesn't seem to be an :empty pseudo-selector (although mozilla want it https://developer.mozilla.org/en-US/docs/Web/CSS/:empty)
             //
-            // Therefore, to be more flexible, we decided to implement a simple DIY solution with the code below,
+            // Also note that removing the <br> using js is not a good idea, because it causes text to go before the empty element
+            // when typing in an empty <div>. When typing after focusing <div contenteditable><p></p></div>,
+            // this happens: <div contenteditable>New text comes here<p></p></div>
+            //
+            // All in all, to be more flexible, we decided to implement a simple DIY solution with the code below,
             // that sets a permanent class on empty elements, so we can also use this in functionality on non-admin
             // pages (eg. when the editor saves a page with no content).
             //
             // The rest of this is implemented in main.less
             var updatePlaceholder = function (event, rawEditorElement)
             {
-                if ($.trim(element.text()) == '') {
+                if (element.text().trim().length == 0) {
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
                 }
                 else {
                     element.removeClass(ImportsConstants.COMMONS_EMPTY_CLASS);
                 }
             };
-            //this will receive all editor keystrokes
+
+            // See https://github.com/yabwe/medium-editor/blob/master/CUSTOM-EVENTS.md
+            // editableInput is triggered whenever the content of a contenteditable changes,
+            // including keypresses, toolbar actions, or any other user interaction that changes the html within the element.
             editor.subscribe('editableInput', updatePlaceholder);
             editor.subscribe('focus', updatePlaceholder);
             editor.subscribe('blur', updatePlaceholder);
