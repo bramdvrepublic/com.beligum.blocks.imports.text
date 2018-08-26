@@ -721,6 +721,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     if (attrRules) {
                         //iterate all the allowed values for this attribute
                         var allowedAttr = false;
+                        var cleanedStyle = '';
                         for (var j = 0; j < attrRules.length && !allowedAttr; j++) {
 
                             var attrAllowedValue = attrRules[j];
@@ -731,15 +732,20 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                             }
                             else {
                                 if (attrName == "style") {
-                                    var styles = attrAllowedValue.split(':');
-                                    var styleName = styles[0].trim();
-                                    var styleValue = styles[1].trim();
-                                    if (styleValue == '*') {
-                                        allowedAttr = el.css(styleName) !== '';
+                                    var allowedStyles = attrAllowedValue.split(':');
+                                    var allowedStyleName = allowedStyles[0].trim();
+                                    var allowedStyleValue = allowedStyles[1].trim();
+                                    //trim the semicolon at the end if there's one
+                                    while (allowedStyleValue.charAt(allowedStyleValue.length - 1) == ';') {
+                                        allowedStyleValue = allowedStyleValue.substring(0, allowedStyleValue.length - 1);
                                     }
-                                    else {
-                                        allowedAttr = el.css(styleName) == styleValue;
+
+                                    //the style value can be anything, just copy it over
+                                    if (allowedStyleValue == '*' || el.css(allowedStyleName) == allowedStyleValue) {
+                                        cleanedStyle += allowedStyleName + ': ' + el.css(allowedStyleName)+'; ';
                                     }
+
+                                    //note: don't set the allowedAttr because we must validate all styles till the end
                                 }
                                 else {
                                     allowedAttr = el.attr(attrName).trim() == attrAllowedValue;
@@ -749,6 +755,10 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                         if (!allowedAttr) {
                             el.removeAttr(attrName);
+                        }
+                        el.removeAttr('style');
+                        if (cleanedStyle != '') {
+                            el.attr('style', cleanedStyle.trim());
                         }
                     }
                     //otherwise, we delete it immediately
