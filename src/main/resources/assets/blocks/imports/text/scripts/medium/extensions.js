@@ -599,4 +599,165 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         //-----PRIVATE FUNCTIONS-----
     });
 
+    this.PasteHandlerExt = Class.create(MediumEditor.extensions.paste, {
+
+        //-----CONSTANTS-----
+        STATIC: {
+            NAME: "paste-ext"
+        },
+
+        //-----VARIABLES-----
+
+        //-----CONSTRUCTORS-----
+        constructor: function (options)
+        {
+            MediumEditorExtensions.PasteHandlerExt.Super.call(this, options);
+
+            this.acceptedStyles = options.acceptedStyles;
+
+            //we'll iterate over the values and make everything an array to smooth processing later on
+            //also, we'll link the general styles into the specific styles so we don't have to differentiate
+            var generalAttrs = this.acceptedStyles['*'];
+            $.each(this.acceptedStyles, function (tagName, attrs)
+            {
+                $.each(attrs, function (attr, value)
+                {
+                    if (!$.isArray(value)) {
+                        attrs[attr] = [value];
+                    }
+                });
+
+                if (tagName != '*') {
+                    $.each(generalAttrs, function (generalAttr, generalValue)
+                    {
+                        if (generalAttr in attrs) {
+                            //append the general array to the existing array
+                            //note that this might possibly double allowed values,
+                            //but that's not such a big deal, right?
+                            for (var i = 0; i < generalValue.length; i++) {
+                                attrs[generalAttr].push(generalValue[i]);
+                            }
+                        }
+                        else {
+                            attrs[generalAttr] = generalValue;
+                        }
+                    });
+                }
+            });
+        },
+
+        //-----OVERLOADED FUNCTIONS-----
+        pasteHTML: function (html, options)
+        {
+            var that = this;
+
+            //note: parseHTML() returns an array of (raw) dom nodes
+            var container = $('<div/>');
+            //var domTags = $.parseHTML('Dit is een test <h1>Met een hoofd</h1> <p> en <b>een</b> paragraaf</p>');
+            var domTags = $.parseHTML(html);
+            for (var i = 0; i < domTags.length; i++) {
+                var node = domTags[i];
+
+                // for the top-level elements, all of them must be wrapped in a tag,
+                // so if we encounter a text-only node name (eg. #text or #comment),
+                // we'll delete the node altogether
+                if (!(node.nodeName.indexOf('#') == 0)) {
+                    var el = $(node);
+                    this._filterElementsRecursively(el);
+                    container.append(el);
+                }
+            }
+
+            //this will bypass the original html cleaning so it doesn't get in our way
+            //but note that the method below does some extra nice things (like cleaning the &nbsp;)
+            //so, we re-activated that one instead (and cleared all options related to pasting)
+            //MediumEditor.util.insertHTMLCommand(this.document, container.html());
+
+            //use this to call the original html cleaning too
+            MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);
+        },
+        _filterElementsRecursively: function (el)
+        {
+            this._filterElement(el);
+
+            var _this = this;
+            el.children().each(function (i, val)
+            {
+                _this._filterElementsRecursively($(val));
+            });
+        },
+        _filterElement: function (el)
+        {
+            //note: compared to tagName, nodeName also returns something for eg #text, #comment, etc.
+            //note that this means free-standing text (not surrounded by an element), will be removed
+            //if nothing is set in the rules for the tag '#text'
+            //Also note that all node names in the style rules must be lowercase
+            var tagRules = this.acceptedStyles[el[0].nodeName.toLowerCase()];
+
+            //if we find rules for this tag, this means it's allowed,
+            //we just need to filter it's attributes
+            if (tagRules) {
+                this._filterAttributes(el, tagRules);
+            }
+            //if it's not allowed, textify it
+            else {
+                el.replaceWith(el.text());
+            }
+        },
+        _filterAttributes: function (el, tagRules)
+        {
+            if (tagRules) {
+
+                //iterate the attributes (using plain JS) of the element
+                //and remove everything that's not allowed
+                var attrs = el[0].attributes;
+                for (var i = 0; i < attrs.length; i++) {
+
+                    var attrName = attrs[i].name;
+
+                    var attrRules = tagRules[attrName];
+                    //if the attribute is in the rules, we keep it and start
+                    //processing it's value
+                    if (attrRules) {
+                        //iterate all the allowed values for this attribute
+                        var allowedAttr = false;
+                        for (var j = 0; j < attrRules.length && !allowedAttr; j++) {
+
+                            var attrAllowedValue = attrRules[j];
+
+                            //if the value is a wildcard, we're safe
+                            if (attrAllowedValue == '*') {
+                                allowedAttr = true;
+                            }
+                            else {
+                                if (attrName == "style") {
+                                    var styles = attrAllowedValue.split(':');
+                                    var styleName = styles[0].trim();
+                                    var styleValue = styles[1].trim();
+                                    if (styleValue == '*') {
+                                        allowedAttr = el.css(styleName) !== '';
+                                    }
+                                    else {
+                                        allowedAttr = el.css(styleName) == styleValue;
+                                    }
+                                }
+                                else {
+                                    allowedAttr = el.attr(attrName).trim() == attrAllowedValue;
+                                }
+                            }
+                        }
+
+                        if (!allowedAttr) {
+                            el.removeAttr(attrName);
+                        }
+                    }
+                    //otherwise, we delete it immediately
+                    else {
+                        el.removeAttr(attrName);
+                    }
+                }
+            }
+        }
+    });
+
 }]);

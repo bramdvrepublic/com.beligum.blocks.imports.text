@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 //-----IMPORTS-----
 @import (reference) "/assets/webjars/bootstrap/3.3.4/less/variables.less";
 @import (reference) "/assets/webjars/bootstrap/3.3.4/less/close.less";
@@ -32,7 +31,6 @@
 @import (reference) "/assets/webjars/less-elements/1.0.0/elements.less";
 @import (reference) "/assets/webjars/bootstrap/3.3.4/less/mixins.less";
 @import (reference) "/assets/webjars/bootstrap/3.3.4/less/utilities.less";
-
 @import (reference) "/assets/blocks/core/styles/mixins.less";
 @import (reference) "/constants/blocks/core?type=less";
 @import (reference) "/constants/blocks/imports/text?type=less";
@@ -87,6 +85,25 @@
 //    white-space: pre;
 //  }
 //}
+
+.medium-editor-element {
+  word-wrap: break-word;
+  min-height: 30px;
+
+  & img {
+    max-width: 100%;
+  }
+  & sub {
+    vertical-align: sub;
+  }
+  & sup {
+    vertical-align: super;
+  }
+}
+
+.medium-editor-hidden {
+  display: none;
+}
 
 .medium-editor-toolbar {
   position: absolute;
@@ -218,6 +235,7 @@
   }
 
 }
+
 .medium-editor-toolbar-form-active {
   display: block;
 }
