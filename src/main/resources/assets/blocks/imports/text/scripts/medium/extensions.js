@@ -649,7 +649,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         //-----OVERLOADED FUNCTIONS-----
         pasteHTML: function (html, options)
         {
-            var that = this;
+            var _this = this;
 
             //note: parseHTML() returns an array of (raw) dom nodes
             var container = $('<div/>');
@@ -673,8 +673,22 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //so, we re-activated that one instead (and cleared all options related to pasting)
             //MediumEditor.util.insertHTMLCommand(this.document, container.html());
 
-            //use this to call the original html cleaning too
-            MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);
+            //This is a dirty workaround for the case where the entire text gets selected (ctrl-a)
+            //and pasted over. There's something wrong (at least on Chrome) if the first tag is eg. a <h1>,
+            //that the entire pasted text gets wrapped in a <h1> (sort of) because it doesn't get cleared properly.
+            //We try to detect the select-all-case by comparing the selected html to the entire editor content
+            //and changing the entire content at once if that's the case, solving the paste-issue.
+            if (MediumEditor.selection.getSelectionHtml(this.document).trim() == this.base.getContent()) {
+                this.base.setContent(container.html());
+
+                //this moves the cursor to the end after pasting
+                this.base.selectAllContents();
+                MediumEditor.selection.clearSelection(this.document);
+            }
+            else {
+                //use this to call the original html cleaning too
+                MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);
+            }
         },
         _filterElementsRecursively: function (el)
         {

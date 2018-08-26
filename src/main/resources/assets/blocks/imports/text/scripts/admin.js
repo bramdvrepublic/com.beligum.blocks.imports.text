@@ -125,6 +125,11 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
             {
                 if (element.text().trim().length == 0) {
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
+                    //we do this because deleting everything from the editor
+                    //seems to keep the first used tag alive (eg. <h1><br></h1>)
+                    //and only after backspacing it once more, it gets replaced
+                    //to <p><br></p>. This is weird when behavior, so let's work around it.
+                    element.html('<p><br></p>');
                 }
                 else {
                     element.removeClass(ImportsConstants.COMMONS_EMPTY_CLASS);
