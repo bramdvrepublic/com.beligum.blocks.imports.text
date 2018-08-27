@@ -618,8 +618,20 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //we'll iterate over the values and make everything an array to smooth processing later on
             //also, we'll link the general styles into the specific styles so we don't have to differentiate
             var generalAttrs = this.acceptedStyles['*'];
+            //note: we always need at least a <p> and a <span>, because they
+            //represent the replacement containers for block text and inline text respectively
+            //so we add them if they're not there
+            var hasP = false;
+            var hasSpan = false;
             $.each(this.acceptedStyles, function (tagName, attrs)
             {
+                if (!hasP && tagName.toLowerCase() == 'p') {
+                    hasP = true;
+                }
+                if (!hasSpan && tagName.toLowerCase() == 'span') {
+                    hasSpan = true;
+                }
+
                 $.each(attrs, function (attr, value)
                 {
                     if (!$.isArray(value)) {
@@ -627,7 +639,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     }
                 });
 
-                if (tagName != '*') {
+                if (tagName != '*' && generalAttrs) {
                     $.each(generalAttrs, function (generalAttr, generalValue)
                     {
                         if (generalAttr in attrs) {
@@ -644,6 +656,13 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     });
                 }
             });
+
+            if (!hasP) {
+                this.acceptedStyles['p'] = generalAttrs || {};
+            }
+            if (!hasSpan) {
+                this.acceptedStyles['span'] = generalAttrs || {};
+            }
         },
 
         //-----OVERLOADED FUNCTIONS-----
@@ -662,16 +681,12 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 // so if we encounter a text-only node name (eg. #text or #comment),
                 // we'll delete the node altogether
                 if (!(node.nodeName.indexOf('#') == 0)) {
-                    var el = $(node);
-                    this._filterElementsRecursively(el);
-                    container.append(el);
+                    var filteredNode = this._filterElementsRecursively($(node));
+                    if (filteredNode) {
+                        container.append(filteredNode);
+                    }
                 }
             }
-
-            //this will bypass the original html cleaning so it doesn't get in our way
-            //but note that the method below does some extra nice things (like cleaning the &nbsp;)
-            //so, we re-activated that one instead (and cleared all options related to pasting)
-            //MediumEditor.util.insertHTMLCommand(this.document, container.html());
 
             //This is a dirty workaround for the case where the entire text gets selected (ctrl-a)
             //and pasted over. There's something wrong (at least on Chrome) if the first tag is eg. a <h1>,
@@ -688,35 +703,82 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             else {
                 //use this to call the original html cleaning too
                 MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);
+
+                //this will bypass the original html cleaning so it doesn't get in our way
+                //but note that the method below does some extra nice things (like cleaning the &nbsp;)
+                //so, we re-activated that one instead (and cleared all options related to pasting)
+                //MediumEditor.util.insertHTMLCommand(this.document, container.html());
             }
         },
         _filterElementsRecursively: function (el)
         {
-            this._filterElement(el);
+            el = this._filterElement(el);
 
-            var _this = this;
-            el.children().each(function (i, val)
-            {
-                _this._filterElementsRecursively($(val));
-            });
+            //null value means the element got deleted
+            if (el) {
+                var _this = this;
+                el.children().each(function (i, val)
+                {
+                    var child = $(val);
+                    var filteredChild = _this._filterElementsRecursively(child);
+                    if (filteredChild) {
+                        child.replaceWith(filteredChild);
+                    }
+                    else {
+                        child.remove();
+                    }
+                });
+            }
+
+            return el;
         },
         _filterElement: function (el)
         {
-            //note: compared to tagName, nodeName also returns something for eg #text, #comment, etc.
-            //note that this means free-standing text (not surrounded by an element), will be removed
-            //if nothing is set in the rules for the tag '#text'
-            //Also note that all node names in the style rules must be lowercase
-            var tagRules = this.acceptedStyles[el[0].nodeName.toLowerCase()];
+            var retVal = null;
 
-            //if we find rules for this tag, this means it's allowed,
-            //we just need to filter it's attributes
-            if (tagRules) {
-                this._filterAttributes(el, tagRules);
+            //We'll try to avoid creating empty blocks
+            //note that we shouldn't use text() because some 'empty' elements, like <span>&nbsp;</span>
+            //really do matter and have a function (like adding spacing before and after links)
+            if (el.html().trim() != '') {
+                //note: compared to tagName, nodeName also returns something for eg #text, #comment, etc.
+                //note that this means free-standing text (not surrounded by an element), will be removed
+                //if nothing is set in the rules for the tag '#text'
+                //Also note that all node names in the style rules must be lowercase
+                var tagRules = this.acceptedStyles[el[0].nodeName.toLowerCase()];
+
+                //if we find rules for this tag, this means it's allowed,
+                //we just need to filter it's attributes
+                if (tagRules) {
+                    this._filterAttributes(el, tagRules);
+                    retVal = el;
+                }
+                //if it's not allowed, we textify it, trying to preserve 'blocks'
+                else {
+                    var textContent = el.text();
+                    if (textContent.trim() != '') {
+                        if (el.css('display') == 'block') {
+                            retVal = $('<p/>');
+                        }
+                        //let's try a bit harder to detect a block if the display style isn't set explicitly
+                        //see https://developer.mozilla.org/en-US/docs/Web/HTML/Block-level_elements
+                        else if (el.css('display') == '' && el.is('address,article,aside,blockquote,canvas,' +
+                            'dd,div,dl,dt,fieldset,figcaption,figure,footer,form,' +
+                            'h1,h2,h3,h4,h5,h6,header,hgroup,hr,li,main,nav,noscript,' +
+                            'ol,output,p,pre,section,table,tfoot,ul,video')) {
+                            retVal = $('<p/>');
+                        }
+                        else {
+                            retVal = $('<span/>');
+                        }
+
+                        //from the text(string) docs:
+                        // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
+                        retVal.text(textContent);
+                    }
+                }
             }
-            //if it's not allowed, textify it
-            else {
-                el.replaceWith(el.text());
-            }
+
+            return retVal;
         },
         _filterAttributes: function (el, tagRules)
         {
@@ -756,7 +818,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                                     //the style value can be anything, just copy it over
                                     if (allowedStyleValue == '*' || el.css(allowedStyleName) == allowedStyleValue) {
-                                        cleanedStyle += allowedStyleName + ': ' + el.css(allowedStyleName)+'; ';
+                                        cleanedStyle += allowedStyleName + ': ' + el.css(allowedStyleName) + '; ';
                                     }
 
                                     //note: don't set the allowedAttr because we must validate all styles till the end
