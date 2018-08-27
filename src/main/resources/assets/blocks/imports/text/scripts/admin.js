@@ -125,11 +125,28 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
             {
                 if (element.text().trim().length == 0) {
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
-                    //we do this because deleting everything from the editor
-                    //seems to keep the first used tag alive (eg. <h1><br></h1>)
-                    //and only after backspacing it once more, it gets replaced
-                    //to <p><br></p>. This is weird when behavior, so let's work around it.
-                    element.html('<p><br></p>');
+
+                    //these are two implementations of the same thing, I guess,
+                    //all the checking is not really necessary, when it's empty, it's empty, right?
+                    var USE_V1 = true;
+                    if (USE_V1) {
+                        element.html('<p><br></p>');
+                    }
+                    else {
+                        //we do this because deleting everything from the editor
+                        //seems to keep the first used tag alive (eg. <h1><br></h1>)
+                        //and only after backspacing it once more, it gets replaced
+                        //to <p><br></p>. This is weird when behavior, so let's work around it.
+                        if (element.children().length == 1) {
+                            var child = $(element.children()[0]);
+                            if (child[0].tagName != 'P') {
+                                var grandchildren = child.children();
+                                if (grandchildren.length == 1 && grandchildren[0].tagName == 'BR') {
+                                    element.html('<p><br></p>');
+                                }
+                            }
+                        }
+                    }
                 }
                 else {
                     element.removeClass(ImportsConstants.COMMONS_EMPTY_CLASS);

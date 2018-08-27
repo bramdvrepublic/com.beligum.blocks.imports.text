@@ -573,6 +573,20 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             return form.get(0);
         },
+        doFormSave: function ()
+        {
+            //this is a little preprocessing filter to support naked emails
+            //(we'll prepend the mailto: protocol if we detect a mail address)
+            var input = $(this.getInput());
+            var value = input.val();
+            if (!(value.indexOf('mailto:') == 0)
+                //see http://emailregex.com/
+                && /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(value)) {
+                input.val('mailto:'+value);
+            }
+
+            MediumEditorExtensions.LinkInput.Super.prototype.doFormSave.call(this);
+        },
         getInput: function ()
         {
             return this.getForm().querySelector('input.medium-editor-toolbar-input');
