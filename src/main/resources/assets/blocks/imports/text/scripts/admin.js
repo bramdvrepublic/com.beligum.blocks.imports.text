@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
+base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
 {
     var Text = this;
     this.TAGS = ["blocks-text div", "blocks-text span"];
@@ -41,7 +41,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
             // Preparation
             element.attr("contenteditable", true);
 
-            var inlineEditor = element.prop('tagName') == 'SPAN';
+            var inlineEditor = Commons.isInlineElement(element);
 
             // This is a bit tricky and needs more info:
             // when implementing the data-editor-options feature, it was meanly meant to put on random elements (eg. div and span)
@@ -126,26 +126,34 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "blocks.imports.Property"
                 if (element.text().trim().length == 0) {
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
 
-                    //these are two implementations of the same thing, I guess,
-                    //all the checking is not really necessary, when it's empty, it's empty, right?
-                    var USE_V1 = true;
-                    if (USE_V1) {
-                        element.html('<p><br></p>');
-                    }
-                    else {
-                        //we do this because deleting everything from the editor
-                        //seems to keep the first used tag alive (eg. <h1><br></h1>)
-                        //and only after backspacing it once more, it gets replaced
-                        //to <p><br></p>. This is weird when behavior, so let's work around it.
-                        if (element.children().length == 1) {
-                            var child = $(element.children()[0]);
-                            if (child[0].tagName != 'P') {
-                                var grandchildren = child.children();
-                                if (grandchildren.length == 1 && grandchildren[0].tagName == 'BR') {
-                                    element.html('<p><br></p>');
+                    //note that we shouldn't introduce a paragraph in an inline editor, so we do our best to detect an inline editor
+                    var isBlock = !inlineEditor && (element.css('display') == 'block' || Commons.isBlockElement(element));
+
+                    if (isBlock) {
+                        //these are two implementations of the same thing, I guess,
+                        //all the checking is not really necessary, when it's empty, it's empty, right?
+                        var USE_V1 = true;
+                        if (USE_V1) {
+                            element.html('<p><br></p>');
+                        }
+                        else {
+                            //we do this because deleting everything from the editor
+                            //seems to keep the first used tag alive (eg. <h1><br></h1>)
+                            //and only after backspacing it once more, it gets replaced
+                            //to <p><br></p>. This is weird when behavior, so let's work around it.
+                            if (element.children().length == 1) {
+                                var child = $(element.children()[0]);
+                                if (child[0].tagName.toLowerCase() != 'p') {
+                                    var grandchildren = child.children();
+                                    if (grandchildren.length == 1 && grandchildren[0].tagName.toLowerCase() == 'br') {
+                                        element.html('<p><br></p>');
+                                    }
                                 }
                             }
                         }
+                    }
+                    else {
+                        //for now, we don't manipulate the content of inline editors
                     }
                 }
                 else {

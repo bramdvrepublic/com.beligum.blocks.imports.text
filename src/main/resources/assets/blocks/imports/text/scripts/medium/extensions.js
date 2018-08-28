@@ -628,6 +628,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             MediumEditorExtensions.PasteHandlerExt.Super.call(this, options);
 
             this.acceptedStyles = options.acceptedStyles;
+            this.inlineEditor = options.inlineEditor;
 
             //we'll iterate over the values and make everything an array to smooth processing later on
             //also, we'll link the general styles into the specific styles so we don't have to differentiate
@@ -637,41 +638,53 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //so we add them if they're not there
             var hasP = false;
             var hasSpan = false;
+            var _this = this;
             $.each(this.acceptedStyles, function (tagName, attrs)
             {
-                if (!hasP && tagName.toLowerCase() == 'p') {
-                    hasP = true;
-                }
-                if (!hasSpan && tagName.toLowerCase() == 'span') {
-                    hasSpan = true;
-                }
+                //uniformize
+                var tagNameLower = tagName.toLowerCase();
 
-                $.each(attrs, function (attr, value)
-                {
-                    if (!$.isArray(value)) {
-                        attrs[attr] = [value];
+                //if we're dealing with an inline editor,
+                //we need to remove all blocks or we'll end up with invalid states
+                if (options.inlineEditor && Commons.isBlockElement(tagNameLower)) {
+                    delete _this.acceptedStyles[tagName];
+                }
+                else {
+
+                    if (!hasP && tagNameLower == 'p') {
+                        hasP = true;
                     }
-                });
+                    if (!hasSpan && tagNameLower == 'span') {
+                        hasSpan = true;
+                    }
 
-                if (tagName != '*' && generalAttrs) {
-                    $.each(generalAttrs, function (generalAttr, generalValue)
+                    $.each(attrs, function (attr, value)
                     {
-                        if (generalAttr in attrs) {
-                            //append the general array to the existing array
-                            //note that this might possibly double allowed values,
-                            //but that's not such a big deal, right?
-                            for (var i = 0; i < generalValue.length; i++) {
-                                attrs[generalAttr].push(generalValue[i]);
-                            }
-                        }
-                        else {
-                            attrs[generalAttr] = generalValue;
+                        if (!$.isArray(value)) {
+                            attrs[attr] = [value];
                         }
                     });
+
+                    if (tagNameLower != '*' && generalAttrs) {
+                        $.each(generalAttrs, function (generalAttr, generalValue)
+                        {
+                            if (generalAttr in attrs) {
+                                //append the general array to the existing array
+                                //note that this might possibly double allowed values,
+                                //but that's not such a big deal, right?
+                                for (var i = 0; i < generalValue.length; i++) {
+                                    attrs[generalAttr].push(generalValue[i]);
+                                }
+                            }
+                            else {
+                                attrs[generalAttr] = generalValue;
+                            }
+                        });
+                    }
                 }
             });
 
-            if (!hasP) {
+            if (!hasP && !options.inlineEditor) {
                 this.acceptedStyles['p'] = generalAttrs || {};
             }
             if (!hasSpan) {
@@ -729,7 +742,8 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             el = this._filterElement(el);
 
             //null value means the element got deleted
-            if (el) {
+            //no children means the returned value is a string or a text node
+            if (el && el.children) {
                 var _this = this;
                 el.children().each(function (i, val)
                 {
@@ -766,28 +780,30 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     this._filterAttributes(el, tagRules);
                     retVal = el;
                 }
-                //if it's not allowed, we textify it, trying to preserve 'blocks'
+                //if this tag is not allowed, we textify it, trying to preserve 'blocks'
                 else {
                     var textContent = el.text();
                     if (textContent.trim() != '') {
-                        if (el.css('display') == 'block') {
-                            retVal = $('<p/>');
+                        var isBlock = (el.css('display') == 'block' || Commons.isBlockElement(el));
+                        if (!this.inlineEditor && isBlock) {
+                            //from the text(string) docs:
+                            // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
+                            retVal = $('<p/>').text(textContent);
                         }
-                        //let's try a bit harder to detect a block if the display style isn't set explicitly
-                        //see https://developer.mozilla.org/en-US/docs/Web/HTML/Block-level_elements
-                        else if (el.css('display') == '' && el.is('address,article,aside,blockquote,canvas,' +
-                            'dd,div,dl,dt,fieldset,figcaption,figure,footer,form,' +
-                            'h1,h2,h3,h4,h5,h6,header,hgroup,hr,li,main,nav,noscript,' +
-                            'ol,output,p,pre,section,table,tfoot,ul,video')) {
-                            retVal = $('<p/>');
+                        else if (this.inlineEditor && isBlock) {
+                            //Note: creating a span here (remember we're in inline mode)
+                            //isn't the right solution, we just want to convert it to
+                            //a text node, so the editor's content won't be cluttered with
+                            //a bunch of <span> wrapped text
+                            //Note: if we convert a block element to an inline element because we're in
+                            //inline mode, we need to append a space too, because this would
+                            //join the texts of two blocks together without spacing.
+                            //This means the last one will have a trailing space, but I can live with that
+                            retVal = document.createTextNode(textContent + ' ');
                         }
                         else {
-                            retVal = $('<span/>');
+                            retVal = $('<span/>').text(textContent);
                         }
-
-                        //from the text(string) docs:
-                        // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
-                        retVal.text(textContent);
                     }
                 }
             }

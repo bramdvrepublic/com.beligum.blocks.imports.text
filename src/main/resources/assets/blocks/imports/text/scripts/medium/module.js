@@ -191,7 +191,8 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
             unwrapTags: [],
 
             //custom object, see extension.js
-            acceptedStyles: acceptedPastedStyles
+            acceptedStyles: acceptedPastedStyles,
+            inlineEditor: inline
         };
         options.paste = pasteOptions;
 
@@ -202,18 +203,18 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         options.extensions[Extensions.LinkInput.NAME] = new Extensions.LinkInput({});
 
         if (!hideToolbar) {
-            var toolbarOptions = {};
+            var toolbarOptions = {
+                //enable the toolbar always displaying in the same location relative to the medium-editor element.
+                static: true,
+                //this enables updating the state of the toolbar buttons even when the selection is collapsed (there is no selection, just a cursor)
+                updateOnEmptySelection: true,
+                buttons: toolbarButtons,
+                align: 'left'
+            };
 
-            //enable the toolbar always displaying in the same location relative to the medium-editor element.
-            toolbarOptions.static = true;
-            //this enables updating the state of the toolbar buttons even when the selection is collapsed (there is no selection, just a cursor)
-            toolbarOptions.updateOnEmptySelection = true;
-            if (!inline) {
-                toolbarOptions.buttons = toolbarButtons;
-            } else {
+            if (inline) {
                 toolbarOptions.buttons = toolbarButtonsInline;
             }
-            toolbarOptions.align = 'left';
 
             options.toolbar = toolbarOptions;
         }
