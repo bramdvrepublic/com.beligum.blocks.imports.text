@@ -153,7 +153,9 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                         }
                     }
                     else {
-                        //for now, we don't manipulate the content of inline editors
+                        //this is a quick fix for disappearing text after deleting a pasted text,
+                        //but it doesn't seem to happen anymore
+                        //element.html('&nbsp;');
                     }
                 }
                 else {
@@ -165,6 +167,16 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             // editableInput is triggered whenever the content of a contenteditable changes,
             // including keypresses, toolbar actions, or any other user interaction that changes the html within the element.
             editor.subscribe('editableInput', updatePlaceholder);
+            //a work around for the bug that the editor is not empty (yet) on key _down_
+            // see https://github.com/orthes/medium-editor-insert-plugin/issues/408
+            editor.subscribe('editableKeydownDelete', function (event, rawEditorElement)
+            {
+                setTimeout(function ()
+                {
+                    updatePlaceholder(event, rawEditorElement)
+                }, 100);
+            });
+            editor.subscribe('editablePaste', updatePlaceholder);
             editor.subscribe('focus', updatePlaceholder);
             editor.subscribe('blur', updatePlaceholder);
 

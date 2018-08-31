@@ -582,7 +582,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             if (!(value.indexOf('mailto:') == 0)
                 //see http://emailregex.com/
                 && /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(value)) {
-                input.val('mailto:'+value);
+                input.val('mailto:' + value);
             }
 
             MediumEditorExtensions.LinkInput.Super.prototype.doFormSave.call(this);
@@ -633,11 +633,10 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //we'll iterate over the values and make everything an array to smooth processing later on
             //also, we'll link the general styles into the specific styles so we don't have to differentiate
             var generalAttrs = this.acceptedStyles['*'];
-            //note: we always need at least a <p> and a <span>, because they
-            //represent the replacement containers for block text and inline text respectively
-            //so we add them if they're not there
+            //note: we always need at least a <p>, because it
+            //represents the replacement containers for block text
+            //so we add it if it's not there
             var hasP = false;
-            var hasSpan = false;
             var _this = this;
             $.each(this.acceptedStyles, function (tagName, attrs)
             {
@@ -653,9 +652,6 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                     if (!hasP && tagNameLower == 'p') {
                         hasP = true;
-                    }
-                    if (!hasSpan && tagNameLower == 'span') {
-                        hasSpan = true;
                     }
 
                     $.each(attrs, function (attr, value)
@@ -687,9 +683,6 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             if (!hasP && !options.inlineEditor) {
                 this.acceptedStyles['p'] = generalAttrs || {};
             }
-            if (!hasSpan) {
-                this.acceptedStyles['span'] = generalAttrs || {};
-            }
         },
 
         //-----OVERLOADED FUNCTIONS-----
@@ -704,37 +697,52 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             for (var i = 0; i < domTags.length; i++) {
                 var node = domTags[i];
 
-                // for the top-level elements, all of them must be wrapped in a tag,
-                // so if we encounter a text-only node name (eg. #text or #comment),
-                // we'll delete the node altogether
-                if (!(node.nodeName.indexOf('#') == 0)) {
-                    var filteredNode = this._filterElementsRecursively($(node));
-                    if (filteredNode) {
-                        container.append(filteredNode);
-                    }
+                var filteredNode = this._filterElementsRecursively($(node));
+                if (filteredNode) {
+                    container.append(filteredNode);
                 }
             }
 
-            //This is a dirty workaround for the case where the entire text gets selected (ctrl-a)
-            //and pasted over. There's something wrong (at least on Chrome) if the first tag is eg. a <h1>,
-            //that the entire pasted text gets wrapped in a <h1> (sort of) because it doesn't get cleared properly.
-            //We try to detect the select-all-case by comparing the selected html to the entire editor content
-            //and changing the entire content at once if that's the case, solving the paste-issue.
-            if (MediumEditor.selection.getSelectionHtml(this.document).trim() == this.base.getContent()) {
-                this.base.setContent(container.html());
+            //these are two methods we took over from the parent method
+            //(to be found with: MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);)
+            this.cleanupSpans(container[0]);
+            var filteredHtml = container.html().replace(/&nbsp;/g, ' ');
 
-                //this moves the cursor to the end after pasting
-                this.base.selectAllContents();
-                MediumEditor.selection.clearSelection(this.document);
-            }
-            else {
-                //use this to call the original html cleaning too
-                MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);
+            //note: we switched to using the Rangy library for managing the selection,
+            //because it frees us from a lot of headache
+            var sel = rangy.getSelection();
+            if (sel.rangeCount > 0) {
+                var range = sel.getRangeAt(0);
 
-                //this will bypass the original html cleaning so it doesn't get in our way
-                //but note that the method below does some extra nice things (like cleaning the &nbsp;)
-                //so, we re-activated that one instead (and cleared all options related to pasting)
-                //MediumEditor.util.insertHTMLCommand(this.document, container.html());
+                //this is a workaround for a bug in chrome and others:
+                //when triple-clicking a line (eg. a <h1>, the entire line gets selected,
+                //but secretly, the beginning of the next line as well. If you paste something,
+                //the text is placed on the next line, but the first empty <h1> is kept around
+                //for unknown reasons.
+                //Our solution is to ask for all the nodes that are selected before executing
+                //the deleteContents() and iterating them afterwards, deleting all the nodes
+                //that still exist and are empty
+                var nodes = range.getNodes();
+
+                //taken from https://github.com/timdown/rangy/blob/1e55169d2e4d1d9458c2a87119addf47a8265276/src/modules/rangy-textrange.js#L1836
+                range.deleteContents();
+                if (filteredHtml) {
+                    var frag = range.createContextualFragment(filteredHtml);
+                    var lastChild = frag.lastChild;
+                    range.insertNode(frag);
+                    range.collapseAfter(lastChild);
+                }
+
+                //see comments above
+                for (var i = 0; i < nodes.length; i++) {
+                    var n = nodes[i];
+                    if (n && n.tagName) {
+                        var nEl = $(n);
+                        if (nEl.is(':empty')) {
+                            nEl.remove();
+                        }
+                    }
+                }
             }
         },
         _filterElementsRecursively: function (el)
@@ -767,12 +775,14 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //We'll try to avoid creating empty blocks
             //note that we shouldn't use text() because some 'empty' elements, like <span>&nbsp;</span>
             //really do matter and have a function (like adding spacing before and after links)
-            if (el.html().trim() != '') {
+            var nodeName = el[0].nodeName;
+            var isTextNode = nodeName.indexOf('#') == 0;
+            if (isTextNode || el.html().trim() != '') {
                 //note: compared to tagName, nodeName also returns something for eg #text, #comment, etc.
                 //note that this means free-standing text (not surrounded by an element), will be removed
                 //if nothing is set in the rules for the tag '#text'
                 //Also note that all node names in the style rules must be lowercase
-                var tagRules = this.acceptedStyles[el[0].nodeName.toLowerCase()];
+                var tagRules = this.acceptedStyles[nodeName.toLowerCase()];
 
                 //if we find rules for this tag, this means it's allowed,
                 //we just need to filter it's attributes
@@ -784,25 +794,22 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 else {
                     var textContent = el.text();
                     if (textContent.trim() != '') {
-                        var isBlock = (el.css('display') == 'block' || Commons.isBlockElement(el));
+                        var isBlock = !isTextNode && (el.css('display') == 'block' || Commons.isBlockElement(el));
                         if (!this.inlineEditor && isBlock) {
                             //from the text(string) docs:
                             // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
                             retVal = $('<p/>').text(textContent);
                         }
-                        else if (this.inlineEditor && isBlock) {
-                            //Note: creating a span here (remember we're in inline mode)
-                            //isn't the right solution, we just want to convert it to
-                            //a text node, so the editor's content won't be cluttered with
+                        else {
+                            //Note: creating a span here isn't the right solution,
+                            // we just want to convert it to a text node,
+                            // so the editor's content won't be cluttered with
                             //a bunch of <span> wrapped text
                             //Note: if we convert a block element to an inline element because we're in
                             //inline mode, we need to append a space too, because this would
                             //join the texts of two blocks together without spacing.
                             //This means the last one will have a trailing space, but I can live with that
                             retVal = document.createTextNode(textContent + ' ');
-                        }
-                        else {
-                            retVal = $('<span/>').text(textContent);
                         }
                     }
                 }
@@ -816,10 +823,20 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                 //iterate the attributes (using plain JS) of the element
                 //and remove everything that's not allowed
-                var attrs = el[0].attributes;
-                for (var i = 0; i < attrs.length; i++) {
+                var attrs = [];
+                //note: we need to build a temp array because we're about to modify the attributes on the fly
+                var elAttrs = el[0].attributes;
+                for (var i = 0; i < elAttrs.length; i++) {
+                    var a = elAttrs[i];
+                    attrs.push({
+                        name: a.name,
+                        value: a.value
+                    });
+                }
 
+                for (var i = 0; i < attrs.length; i++) {
                     var attrName = attrs[i].name;
+                    var attrValue = attrs[i].value;
 
                     var attrRules = tagRules[attrName];
                     //if the attribute is in the rules, we keep it and start
@@ -854,7 +871,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                                     //note: don't set the allowedAttr because we must validate all styles till the end
                                 }
                                 else {
-                                    allowedAttr = el.attr(attrName).trim() == attrAllowedValue;
+                                    allowedAttr = attrValue.trim() == attrAllowedValue;
                                 }
                             }
                         }
