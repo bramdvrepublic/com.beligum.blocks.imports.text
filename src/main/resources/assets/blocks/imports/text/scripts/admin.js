@@ -173,8 +173,16 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             {
                 setTimeout(function ()
                 {
-                    updatePlaceholder(event, rawEditorElement)
-                }, 100);
+                    updatePlaceholder(event, rawEditorElement);
+
+                    //the toolbar seems to be lost when doing the above,
+                    //make sure that doesn't happen
+                    var toolbar = editor.getExtensionByName('toolbar');
+                    if (toolbar) {
+                        $(toolbar.getToolbarElement()).addClass('medium-editor-toolbar-active');
+                    }
+
+                }, 250);
             });
             editor.subscribe('editablePaste', updatePlaceholder);
             editor.subscribe('focus', updatePlaceholder);
