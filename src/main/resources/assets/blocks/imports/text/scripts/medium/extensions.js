@@ -703,47 +703,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 }
             }
 
-            //these are two methods we took over from the parent method
-            //(to be found with: MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);)
-            this.cleanupSpans(container[0]);
-            var filteredHtml = container.html().replace(/&nbsp;/g, ' ');
-
-            //note: we switched to using the Rangy library for managing the selection,
-            //because it frees us from a lot of headache
-            var sel = rangy.getSelection();
-            if (sel.rangeCount > 0) {
-                var range = sel.getRangeAt(0);
-
-                //this is a workaround for a bug in chrome and others:
-                //when triple-clicking a line (eg. a <h1>, the entire line gets selected,
-                //but secretly, the beginning of the next line as well. If you paste something,
-                //the text is placed on the next line, but the first empty <h1> is kept around
-                //for unknown reasons.
-                //Our solution is to ask for all the nodes that are selected before executing
-                //the deleteContents() and iterating them afterwards, deleting all the nodes
-                //that still exist and are empty
-                var nodes = range.getNodes();
-
-                //taken from https://github.com/timdown/rangy/blob/1e55169d2e4d1d9458c2a87119addf47a8265276/src/modules/rangy-textrange.js#L1836
-                range.deleteContents();
-                if (filteredHtml) {
-                    var frag = range.createContextualFragment(filteredHtml);
-                    var lastChild = frag.lastChild;
-                    range.insertNode(frag);
-                    range.collapseAfter(lastChild);
-                }
-
-                //see comments above
-                for (var i = 0; i < nodes.length; i++) {
-                    var n = nodes[i];
-                    if (n && n.tagName) {
-                        var nEl = $(n);
-                        if (nEl.is(':empty')) {
-                            nEl.remove();
-                        }
-                    }
-                }
-            }
+            this._insertHTML(container);
         },
         _filterElementsRecursively: function (el)
         {
@@ -890,7 +850,106 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     }
                 }
             }
+        },
+        /**
+         * This is basically our own implementation of the standard insertHTML() command
+         * because we wanted to be able to control it more tightly.
+         * We started out with the insertHTMLCommand() in the Medium Editor source code,
+         * and pulled in the Rangy library for more control over the selected text.
+         */
+        _insertHTML: function (htmlContainer)
+        {
+            //note: we switched to using the Rangy library for managing the selection,
+            //because it frees us from a lot of headache
+            var sel = rangy.getSelection();
+            if (sel.rangeCount > 0) {
+
+                //this helps a lot in removing any whitespace from the start and end of the selection
+                //and especially when using a triple-click on full paragraphs. But note that this will
+                //also trim the spaces from an eg. regular text section, yielding in a result where
+                //the selected space will be unselected before the paste is done, which feels unnatural.
+                //But for now, the benefits of the first case are more important.
+                //Update: we modified this to trimEnd() (instead of just trim()) and introduced a check
+                //for a text node at the end of the selection, resulting is more natural behavior for the
+                //case described above.
+                if (sel.focusNode && sel.focusNode.nodeName && sel.focusNode.nodeName != '#text') {
+                    sel.trimEnd();
+                }
+
+                //note that normal use only supports one selection
+                var range = sel.getRangeAt(0);
+
+                //this is a workaround for a bug in chrome and others:
+                //when triple-clicking a line (eg. a <h1>, the entire line gets selected,
+                //but secretly, the beginning of the next line as well. If you paste something,
+                //the text is placed on the next line, but the first empty <h1> is kept around
+                //for unknown reasons.
+                //Our solution is to ask for all the nodes that are selected before executing
+                //the deleteContents() and iterating them afterwards, deleting all the nodes
+                //that still exist and are empty
+                var nodes = range.getNodes();
+
+                //some preliminary cleanup
+                //we get in trouble when empty tags get pasted because they're
+                //not always selectable (and thus undeletable), so we get rid of them
+                //Note that this won't delete tags with text nodes, which is okay
+                htmlContainer.find(':empty').remove();
+
+                //Now do the real pasting of the new cleaned html
+                var USE_BUILTIN_PASTING = true;
+                if (USE_BUILTIN_PASTING) {
+                    MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, htmlContainer.html(),
+                        //we make this empty because the whole point is we did this part outself
+                        {
+                            cleanAttrs: [],
+                            cleanTags: [],
+                            unwrapTags: []
+                        }
+                    );
+                }
+                else {
+
+                    // code below is taken and adapted from
+                    // https://github.com/timdown/rangy/blob/1e55169d2e4d1d9458c2a87119addf47a8265276/src/modules/rangy-textrange.js#L1836
+                    range.deleteContents();
+
+                    //these are two methods we took over from the parent method
+                    //(to be found with: MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);)
+                    this.cleanupSpans(htmlContainer[0]);
+                    var html = htmlContainer.html().replace(/&nbsp;/g, ' ');
+
+                    if (html) {
+                        var frag = range.createContextualFragment(html);
+                        var lastChild = frag.lastChild;
+                        range.insertNode(frag);
+                        range.collapseAfter(lastChild);
+                    }
+                }
+
+                //see comments above
+                for (var i = 0; i < nodes.length; i++) {
+                    var n = nodes[i];
+                    if (n && n.tagName) {
+                        var nEl = $(n);
+                        if (nEl.is(':empty')) {
+                            nEl.remove();
+                        }
+                    }
+                }
+            }
+
+            //note: as for undo/redo history, see this for more info:
+            //https://stackoverflow.com/questions/28217539/allowing-contenteditable-to-undo-after-dom-modification
+            //For now, we can't undo after pasting :-(
+            //TODO see https://addyosmani.com/blog/mutation-observers/
         }
+
+        //do we need this? Don't think so, it's handled in the updatePlaceholder() of admin.js now
+        // // https://github.com/yabwe/medium-editor/issues/992
+        // // If we're monitoring calls to execCommand, notify listeners as if a real call had happened
+        // if (this.document.execCommand.callListeners) {
+        //     this.document.execCommand.callListeners(['insertHTML', false, html], retVal);
+        // }
     });
 
 }]);

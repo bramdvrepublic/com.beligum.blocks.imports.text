@@ -134,7 +134,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                         //all the checking is not really necessary, when it's empty, it's empty, right?
                         var USE_V1 = true;
                         if (USE_V1) {
-                            element.html('<p><br></p>');
+                            editor.setContent('<p><br></p>');
                         }
                         else {
                             //we do this because deleting everything from the editor
@@ -146,7 +146,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                                 if (child[0].tagName.toLowerCase() != 'p') {
                                     var grandchildren = child.children();
                                     if (grandchildren.length == 1 && grandchildren[0].tagName.toLowerCase() == 'br') {
-                                        element.html('<p><br></p>');
+                                        editor.setContent('<p><br></p>');
                                     }
                                 }
                             }
@@ -155,7 +155,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                     else {
                         //this is a quick fix for disappearing text after deleting a pasted text,
                         //but it doesn't seem to happen anymore
-                        //element.html('&nbsp;');
+                        //editor.setContent('&nbsp;');
                     }
                 }
                 else {
@@ -166,23 +166,29 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             // See https://github.com/yabwe/medium-editor/blob/master/CUSTOM-EVENTS.md
             // editableInput is triggered whenever the content of a contenteditable changes,
             // including keypresses, toolbar actions, or any other user interaction that changes the html within the element.
-            editor.subscribe('editableInput', updatePlaceholder);
+            // Note: don't make this 'editableInput' or it'll receive tons of events
+            //       also don't make it keydown because the editor hasn't changed on key down
+            editor.subscribe('editableKeyup', updatePlaceholder);
             //a work around for the bug that the editor is not empty (yet) on key _down_
-            // see https://github.com/orthes/medium-editor-insert-plugin/issues/408
+            //see https://github.com/orthes/medium-editor-insert-plugin/issues/408
             editor.subscribe('editableKeydownDelete', function (event, rawEditorElement)
             {
-                setTimeout(function ()
-                {
-                    updatePlaceholder(event, rawEditorElement);
+                //let's execute this a number of times, so the user
+                //feels it's don't immediately, and we're sure it's done eventually
+                for (var t = 0; t <= 300; t += 100) {
+                    setTimeout(function ()
+                    {
+                        updatePlaceholder(event, rawEditorElement);
 
-                    //the toolbar seems to be lost when doing the above,
-                    //make sure that doesn't happen
-                    var toolbar = editor.getExtensionByName('toolbar');
-                    if (toolbar) {
-                        $(toolbar.getToolbarElement()).addClass('medium-editor-toolbar-active');
-                    }
+                        //the toolbar seems to be lost when doing the above,
+                        //make sure that doesn't happen
+                        var toolbar = editor.getExtensionByName('toolbar');
+                        if (toolbar) {
+                            $(toolbar.getToolbarElement()).addClass('medium-editor-toolbar-active');
+                        }
 
-                }, 250);
+                    }, t);
+                }
             });
             editor.subscribe('editablePaste', updatePlaceholder);
             editor.subscribe('focus', updatePlaceholder);
