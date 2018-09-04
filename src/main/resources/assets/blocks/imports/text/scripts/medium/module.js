@@ -196,6 +196,12 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         };
         options.paste = pasteOptions;
 
+        //overwrite the removeFormat button because we want it to remove the formatting more agressively
+        //note that all builtin buttons are represented by the same object and have 'action' properties
+        //to distinguish between them, so we need to override that pase object and differentiate
+        //in the handleClick() event handler
+        MediumEditor.extensions.button = Extensions.ButtonExt;
+
         //overwrite the default paste extension with our custom overloaded version (see extensions.js)
         MediumEditor.extensions.paste = Extensions.PasteHandlerExt;
 

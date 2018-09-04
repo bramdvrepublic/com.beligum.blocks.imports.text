@@ -44,7 +44,7 @@ public class Settings
     }
 
     //-----PUBLIC METHODS-----
-    public String getStylesMapJson() throws JsonProcessingException
+    public String getStylesMapJson()
     {
         if (this.cachedSylesMapJson == null) {
             this.cachedSylesMapJson = com.beligum.blocks.imports.commons.config.Settings.instance().getConstantsJsonMap(STYLES_PREFIX + ".style");

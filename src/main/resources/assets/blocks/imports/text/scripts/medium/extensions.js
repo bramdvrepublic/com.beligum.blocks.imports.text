@@ -613,6 +613,56 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         //-----PRIVATE FUNCTIONS-----
     });
 
+    this.ButtonExt = Class.create(MediumEditor.extensions.button, {
+
+        //-----CONSTANTS-----
+
+        //-----VARIABLES-----
+
+        //-----CONSTRUCTORS-----
+        constructor: function (options)
+        {
+            MediumEditorExtensions.ButtonExt.Super.call(this, options);
+        },
+
+        //-----OVERLOADED FUNCTIONS-----
+        handleClick: function (event)
+        {
+            if (this.name == 'removeFormat') {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                //this will not only remove formatting (eg. <b> and <i>) in this element,
+                //but offers us a way to wipe the entire styling of the selected tag,
+                //possibly correcting mistakes and so on
+                //Note that this is a bit brute force and doesn't take there real selection
+                //into account, but we can live with that
+                var range = MediumEditor.selection.getSelectionRange(this.document);
+                var elNode = MediumEditor.selection.getSelectedParentElement(range);
+                if (elNode) {
+                    var el = $(elNode);
+
+                    //detect inline mode and add a <p> to the text if we're
+                    //dealing with full-html editing
+                    if (this.base.options.disableReturn) {
+                        el.replaceWith(el.text());
+                    }
+                    else {
+                        el.replaceWith($('</p>').html(el.text()));
+                    }
+
+                    //this is a chance to delete left-over (and undeletable) empty tags
+                    // that are messing up the formatting
+                    el.find(':empty').remove();
+                }
+            }
+            else {
+                MediumEditorExtensions.ButtonExt.Super.prototype.handleClick.call(this, event);
+            }
+        },
+    });
+
     this.PasteHandlerExt = Class.create(MediumEditor.extensions.paste, {
 
         //-----CONSTANTS-----
@@ -775,6 +825,25 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 }
             }
 
+            if (retVal) {
+                //these are two cleaning methods we took over from the parent method
+                //(to be found with: MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);)
+                if (typeof retVal === 'string' || retVal instanceof String) {
+                    //no need to cleanup spans when we're a string
+                    retVal = retVal.replace(/&nbsp;/g, ' ');
+                }
+                //when it's not a string, it's a jquery element
+                else {
+
+                    //this will probably be just one
+                    for (var i = 0; i < retVal.length; i++) {
+                        this.cleanupSpans(retVal[i]);
+                    }
+
+                    retVal.html(retVal.html().replace(/&nbsp;/g, ' '));
+                }
+            }
+
             return retVal;
         },
         _filterAttributes: function (el, tagRules)
@@ -862,10 +931,12 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //note: we switched to using the Rangy library for managing the selection,
             //because it frees us from a lot of headache
             var sel = rangy.getSelection();
+
             if (sel.rangeCount > 0) {
 
                 //this helps a lot in removing any whitespace from the start and end of the selection
-                //and especially when using a triple-click on full paragraphs. But note that this will
+                //and especially when using a triple-click on full paragraphs (which also selects the newline
+                // up until just before the next tag). But note that this will
                 //also trim the spaces from an eg. regular text section, yielding in a result where
                 //the selected space will be unselected before the paste is done, which feels unnatural.
                 //But for now, the benefits of the first case are more important.
@@ -873,7 +944,12 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 //for a text node at the end of the selection, resulting is more natural behavior for the
                 //case described above.
                 if (sel.focusNode && sel.focusNode.nodeName && sel.focusNode.nodeName != '#text') {
-                    sel.trimEnd();
+                    //if we have nothing selected (the cursor is just placed somewhere),
+                    //this would stop the paste from happening, so avoid that
+                    var noSelection = sel.focusNode == sel.anchorNode && sel.focusOffset == 0 && sel.anchorOffset == 0;
+                    if (!noSelection) {
+                        sel.trimEnd();
+                    }
                 }
 
                 //note that normal use only supports one selection
@@ -887,55 +963,104 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 //Our solution is to ask for all the nodes that are selected before executing
                 //the deleteContents() and iterating them afterwards, deleting all the nodes
                 //that still exist and are empty
-                var nodes = range.getNodes();
+                //Update: we don't do this anymore because we wipe _all_ empty tags, see below
+                //var nodes = range.getNodes();
 
-                //some preliminary cleanup
-                //we get in trouble when empty tags get pasted because they're
-                //not always selectable (and thus undeletable), so we get rid of them
-                //Note that this won't delete tags with text nodes, which is okay
-                htmlContainer.find(':empty').remove();
+                //first the first parent element around the selection
+                //If it's a block element and the pasted code is also
+                //wrapped by a block element, we'll need to strip
+                //the blocks from the pasted html because otherwise
+                //it's eg. possible to paste a <p> inside a <h1> and
+                //we don't want that
+                var parentNode = range.commonAncestorContainer;
+                var parentEl = parentNode;
+                while (parentEl.nodeName.indexOf('#') != -1) {
+                    parentEl = parentEl.parentNode;
+                }
+
+                var parent = $(parentEl);
+                if (Commons.isBlockElement(parent)) {
+                    //note that if we just created a new paragraph where the new text
+                    //needs to be placed, we'll be in a <p><br></p> parent.
+                    //So let's skip the cleaning because it's sort of the whole
+                    //point of allowing to paste formatted code in a new paragraph.
+                    if (parent.text() != '') {
+                        //these are all top-level children
+                        var children = htmlContainer.children();
+                        children.each(function (index)
+                        {
+                            var child = $(this);
+                            while (child.length > 0 && Commons.isBlockElement(child)) {
+                                var childInner = child.html();
+                                child.replaceWith(childInner);
+                                child = childInner;
+                            }
+                        });
+                    }
+                }
 
                 //Now do the real pasting of the new cleaned html
+                //but note that non-builtin pasting doesn't have undo...
                 var USE_BUILTIN_PASTING = true;
                 if (USE_BUILTIN_PASTING) {
+
                     MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, htmlContainer.html(),
-                        //we make this empty because the whole point is we did this part outself
+                        // we make this empty because the whole point is we did this part outself
                         {
                             cleanAttrs: [],
                             cleanTags: [],
                             unwrapTags: []
                         }
                     );
-                }
-                else {
+                    //this is the naked version of the command above if we'd ever need it
+                    //MediumEditor.util.insertHTMLCommand(this.document, htmlContainer[0].innerHTML.replace(/&nbsp;/g, ' '));
 
-                    // code below is taken and adapted from
-                    // https://github.com/timdown/rangy/blob/1e55169d2e4d1d9458c2a87119addf47a8265276/src/modules/rangy-textrange.js#L1836
-                    range.deleteContents();
+                    var DO_EXTRA_CLEANUP = true;
 
-                    //these are two methods we took over from the parent method
-                    //(to be found with: MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);)
-                    this.cleanupSpans(htmlContainer[0]);
-                    var html = htmlContainer.html().replace(/&nbsp;/g, ' ');
+                    if (DO_EXTRA_CLEANUP) {
 
-                    if (html) {
-                        var frag = range.createContextualFragment(html);
-                        var lastChild = frag.lastChild;
-                        range.insertNode(frag);
-                        range.collapseAfter(lastChild);
-                    }
-                }
+                        //note we work on a clone to skip the code below if not needed
+                        var filteredParent = this._filterElementsRecursively(parent.clone());
 
-                //see comments above
-                for (var i = 0; i < nodes.length; i++) {
-                    var n = nodes[i];
-                    if (n && n.tagName) {
-                        var nEl = $(n);
-                        if (nEl.is(':empty')) {
-                            nEl.remove();
+                        //note: this is the part that messes up the undo/redo,
+                        //so don't do it if it's not needed
+                        if (filteredParent.html() != parent.html()) {
+
+                            //needed to keep selection after cleanup below
+                            this.base.saveSelection();
+
+                            //The builtin 'insertHTML' command introduces too many own styling
+                            // (like automatically inserting span styles with 'font-style: normal' when they come after a <a> in a <h1>)
+                            //so we'll need to re-clean it! Only problem is that if we undo this and redo it afterwards, it will
+                            //redo with the unprocessed html but we can live with that
+                            parent.replaceWith(filteredParent);
+
+                            this.base.restoreSelection();
                         }
                     }
                 }
+                //use Rangy pasting instead: note that we lose undo/redo functionality
+                else {
+                    range.pasteHtml(htmlContainer.html());
+                }
+
+                //Update: see above why this is commented
+                // //see comments above, this is the second part
+                // for (var i = 0; i < nodes.length; i++) {
+                //     var n = nodes[i];
+                //     if (n && n.tagName) {
+                //         var nEl = $(n);
+                //         if (nEl.is(':empty')) {
+                //             nEl.remove();
+                //         }
+                //     }
+                // }
+
+                //some aftermath cleanup
+                //we get in trouble when empty tags get pasted because they're
+                //not always selectable (and thus undeletable), so we get rid of them
+                //Note that this won't delete tags with text nodes, which is okay
+                parent.find(':empty').remove();
             }
 
             //note: as for undo/redo history, see this for more info:

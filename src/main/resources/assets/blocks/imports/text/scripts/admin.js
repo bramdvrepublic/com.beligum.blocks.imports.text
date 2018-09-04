@@ -126,37 +126,51 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 if (element.text().trim().length == 0) {
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
 
-                    //note that we shouldn't introduce a paragraph in an inline editor, so we do our best to detect an inline editor
-                    var isBlock = !inlineEditor && (element.css('display') == 'block' || Commons.isBlockElement(element));
+                    //this is nice because it syncs the backspace with the delete button and resets everything
+                    //to the same content on a complete clear, but it messes up the undo history, which is a pity.
+                    //Disabled it for that reason, for now...
+                    var FORCE_CLEAR = false;
+                    if (FORCE_CLEAR) {
+                        //note that we shouldn't introduce a paragraph in an inline editor, so we do our best to detect an inline editor
+                        var isBlock = !inlineEditor && (element.css('display') == 'block' || Commons.isBlockElement(element));
 
-                    if (isBlock) {
-                        //these are two implementations of the same thing, I guess,
-                        //all the checking is not really necessary, when it's empty, it's empty, right?
-                        var USE_V1 = true;
-                        if (USE_V1) {
-                            editor.setContent('<p><br></p>');
-                        }
-                        else {
-                            //we do this because deleting everything from the editor
-                            //seems to keep the first used tag alive (eg. <h1><br></h1>)
-                            //and only after backspacing it once more, it gets replaced
-                            //to <p><br></p>. This is weird when behavior, so let's work around it.
-                            if (element.children().length == 1) {
-                                var child = $(element.children()[0]);
-                                if (child[0].tagName.toLowerCase() != 'p') {
-                                    var grandchildren = child.children();
-                                    if (grandchildren.length == 1 && grandchildren[0].tagName.toLowerCase() == 'br') {
-                                        editor.setContent('<p><br></p>');
+                        if (isBlock) {
+                            //these are two implementations of the same thing, I guess,
+                            //all the checking is not really necessary, when it's empty, it's empty, right?
+                            var USE_V1 = true;
+                            if (USE_V1) {
+                                editor.setContent('<p><br></p>');
+                                //three alternatives for future use?
+                                //editor.selectAllContents();
+                                //editor.options.ownerDocument.execCommand('delete', false, null);
+                                //MediumEditor.util.insertHTMLCommand(editor.options.ownerDocument, 'blah');
+                            }
+                            else {
+                                //we do this because deleting everything from the editor
+                                //seems to keep the first used tag alive (eg. <h1><br></h1>)
+                                //and only after backspacing it once more, it gets replaced
+                                //to <p><br></p>. This is weird when behavior, so let's work around it.
+                                if (element.children().length == 1) {
+                                    var child = $(element.children()[0]);
+                                    if (child[0].tagName.toLowerCase() != 'p') {
+                                        var grandchildren = child.children();
+                                        if (grandchildren.length == 1 && grandchildren[0].tagName.toLowerCase() == 'br') {
+                                            editor.setContent('<p><br></p>');
+                                        }
                                     }
                                 }
                             }
                         }
+                        else {
+                            //this is a quick fix for disappearing text after deleting a pasted text,
+                            //but it doesn't seem to happen anymore
+                            //editor.setContent('&nbsp;');
+                        }
                     }
-                    else {
-                        //this is a quick fix for disappearing text after deleting a pasted text,
-                        //but it doesn't seem to happen anymore
-                        //editor.setContent('&nbsp;');
-                    }
+
+                    //make sure we're ready to type again after everything got cleared
+                    element.focus();
+
                 }
                 else {
                     element.removeClass(ImportsConstants.COMMONS_EMPTY_CLASS);
@@ -173,7 +187,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             //see https://github.com/orthes/medium-editor-insert-plugin/issues/408
             editor.subscribe('editableKeydownDelete', function (event, rawEditorElement)
             {
-                //let's execute this a number of times, so the user
+                //let's execute this a number of times in the future, so the user
                 //feels it's don't immediately, and we're sure it's done eventually
                 for (var t = 0; t <= 300; t += 100) {
                     setTimeout(function ()
@@ -182,6 +196,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
 
                         //the toolbar seems to be lost when doing the above,
                         //make sure that doesn't happen
+                        //TODO maybe a checkSelection(); is enough?
                         var toolbar = editor.getExtensionByName('toolbar');
                         if (toolbar) {
                             $(toolbar.getToolbarElement()).addClass('medium-editor-toolbar-active');
@@ -195,7 +210,9 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             editor.subscribe('blur', updatePlaceholder);
 
             //put the cursor where we clicked
-            this._setCursor(hotspot.left, hotspot.top);
+            //Update: this seems to be a better solution...
+            this._setCursor(event.originalEvent.clientX, event.originalEvent.clientY);
+            //this._setCursor(hotspot.left, hotspot.top);
 
             // Add toolbar to sidebar
             var toolbar = $(Editor.getToolbarElement());
@@ -244,10 +261,12 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 range.setStart(pos.offsetNode, pos.offset);
 //            range.setEnd(pos.offsetNode, pos.offset);
 
-            } else if (document.caretRangeFromPoint) {
+            }
+            else if (document.caretRangeFromPoint) {
                 range = document.caretRangeFromPoint(x, y);
-            } else {
-                Logger.debug("Field editing is not supported ...");
+            }
+            else {
+                Logger.warn("Field editing is not supported ...");
             }
 
             return range;
