@@ -802,25 +802,27 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 }
                 //if this tag is not allowed, we textify it, trying to preserve 'blocks'
                 else {
+                    //Note: creating a span here isn't the right solution,
+                    // we just want to convert it to a text node,
+                    // so the editor's content won't be cluttered with
+                    // a bunch of <span> wrapped text
                     var textContent = el.text();
+
+                    //leave the retVal at null if the text is empty
                     if (textContent.trim() != '') {
+
+                        //Note: if we convert a block element to an inline element because we're in
+                        //inline mode, we need to append a space too, because this would
+                        //join the texts of two blocks together without spacing.
+                        //This means the last one will have a trailing space, but I can live with that
                         var isBlock = !isTextNode && (el.css('display') == 'block' || Commons.isBlockElement(el));
-                        if (!this.inlineEditor && isBlock) {
-                            //from the text(string) docs:
-                            // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
-                            retVal = $('<p/>').text(textContent);
+                        if (this.inlineEditor || isBlock) {
+                            textContent += ' ';
                         }
-                        else {
-                            //Note: creating a span here isn't the right solution,
-                            // we just want to convert it to a text node,
-                            // so the editor's content won't be cluttered with
-                            //a bunch of <span> wrapped text
-                            //Note: if we convert a block element to an inline element because we're in
-                            //inline mode, we need to append a space too, because this would
-                            //join the texts of two blocks together without spacing.
-                            //This means the last one will have a trailing space, but I can live with that
-                            retVal = document.createTextNode(textContent + ' ');
-                        }
+
+                        //from the text(string) docs:
+                        // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
+                        retVal = $('<p/>').text(textContent);
                     }
                 }
             }
@@ -837,7 +839,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                     //this will probably be just one
                     for (var i = 0; i < retVal.length; i++) {
-                        this.cleanupSpans(retVal[i]);
+                        if (retVal[i]) {
+                            this.cleanupSpans(retVal[i]);
+                        }
                     }
 
                     retVal.html(retVal.html().replace(/&nbsp;/g, ' '));
@@ -1024,7 +1028,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                         //note: this is the part that messes up the undo/redo,
                         //so don't do it if it's not needed
-                        if (filteredParent.html() != parent.html()) {
+                        if (filteredParent && filteredParent.html() != parent.html()) {
 
                             //needed to keep selection after cleanup below
                             this.base.saveSelection();
