@@ -91,7 +91,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 }
             }
 
-            var editor = Editor.getEditor(element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR]);
+            var editor = Editor.getEditor(element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR], TextConstants.ENABLE_PASTE_HTML_CONFIG == 'true');
 
             // Instead of relying on the standard placeholder functionality, we decided to implement our own:
             // The main problem is that Medium Editor activates the class medium-editor-placeholder on the editor element

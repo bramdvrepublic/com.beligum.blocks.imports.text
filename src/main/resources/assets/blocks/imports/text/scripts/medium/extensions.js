@@ -740,8 +740,15 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         {
             var _this = this;
 
+            var container = this._filterHtml(html);
+
+            this._insertHTML(container);
+        },
+        _filterHtml: function(html)
+        {
             //note: parseHTML() returns an array of (raw) dom nodes
-            var container = $('<div/>');
+            var retVal = $('<div/>');
+
             //var domTags = $.parseHTML('Dit is een test <h1>Met een hoofd</h1> <p> en <b>een</b> paragraaf</p>');
             var domTags = $.parseHTML(html);
             for (var i = 0; i < domTags.length; i++) {
@@ -749,11 +756,11 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                 var filteredNode = this._filterElementsRecursively($(node));
                 if (filteredNode) {
-                    container.append(filteredNode);
+                    retVal.append(filteredNode);
                 }
             }
 
-            this._insertHTML(container);
+            return retVal;
         },
         _filterElementsRecursively: function (el)
         {
@@ -975,7 +982,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 //wrapped by a block element, we'll need to strip
                 //the blocks from the pasted html because otherwise
                 //it's eg. possible to paste a <p> inside a <h1> and
-                //we don't want that
+                //we don't want that, except when the parent element is the editor.
                 var parentNode = range.commonAncestorContainer;
                 var parentEl = parentNode;
                 while (parentEl.nodeName.indexOf('#') != -1) {
@@ -983,7 +990,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 }
 
                 var parent = $(parentEl);
-                if (Commons.isBlockElement(parent)) {
+                if (Commons.isBlockElement(parent) && this.base.elements[0] != parentEl) {
                     //note that if we just created a new paragraph where the new text
                     //needs to be placed, we'll be in a <p><br></p> parent.
                     //So let's skip the cleaning because it's sort of the whole
@@ -1023,13 +1030,15 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                     if (DO_EXTRA_CLEANUP) {
 
-                        //note we work on a clone to skip the code below if not needed
-                        var filteredParent = this._filterElementsRecursively(parent.clone());
+                        var unfilteredHtml = parent.html();
+                        //note that _filterHtml() wraps the result in a container, so unwrap it again with html()
+                        var filteredHtml = this._filterHtml(unfilteredHtml).html();
 
                         //note: this is the part that messes up the undo/redo,
                         //so don't do it if it's not needed
-                        if (filteredParent && filteredParent.html() != parent.html()) {
+                        if (unfilteredHtml != filteredHtml) {
 
+                            //Disabled for now: threw errors sometimes?
                             //needed to keep selection after cleanup below
                             this.base.saveSelection();
 
@@ -1037,7 +1046,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                             // (like automatically inserting span styles with 'font-style: normal' when they come after a <a> in a <h1>)
                             //so we'll need to re-clean it! Only problem is that if we undo this and redo it afterwards, it will
                             //redo with the unprocessed html but we can live with that
-                            parent.replaceWith(filteredParent);
+                            parent.html(filteredHtml);
 
                             this.base.restoreSelection();
                         }

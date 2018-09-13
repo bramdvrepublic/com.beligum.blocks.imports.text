@@ -16,8 +16,8 @@
 
 package com.beligum.blocks.imports.text.config;
 
+import com.beligum.base.server.R;
 import com.beligum.blocks.imports.commons.config.AbstractImportsSettings;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * Created by bram on 12.06.17.
@@ -45,6 +45,10 @@ public class Settings extends AbstractImportsSettings
     }
 
     //-----PUBLIC METHODS-----
+    public boolean getEnablePasteHtmlConfig()
+    {
+        return R.configuration().getBoolean(COMMON_PREFIX + ".enable-paste-html", true);
+    }
 
     //-----PROTECTED METHODS-----
 

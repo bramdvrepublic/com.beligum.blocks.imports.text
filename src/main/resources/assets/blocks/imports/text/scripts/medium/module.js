@@ -42,7 +42,7 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         return retVal;
     };
 
-    this.getEditor = function (element, inline, hideToolbar)
+    this.getEditor = function (element, inline, hideToolbar, enablePasteHtml)
     {
         if (mediumEditor != null) {
             MediumModule.removeEditor();
@@ -178,32 +178,42 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
             }
         }
 
-        var pasteOptions = {
-            //note: default is the force plain text (true)
-            forcePlainText: false,
+        if (enablePasteHtml) {
 
-            //we need to activate this to activate our custom paste plugin in extensions.js
-            cleanPastedHTML: true,
-            //these indicate no more cleaning is to be done by the internal html cleaning
-            cleanReplacements: [],
-            cleanAttrs: [],
-            cleanTags: [],
-            unwrapTags: [],
+            options.paste = {
+                //note: default is the force plain text (true)
+                forcePlainText: false,
 
-            //custom object, see extension.js
-            acceptedStyles: acceptedPastedStyles,
-            inlineEditor: inline
-        };
-        options.paste = pasteOptions;
+                //we need to activate this to activate our custom paste plugin in extensions.js
+                cleanPastedHTML: true,
+                //these indicate no more cleaning is to be done by the internal html cleaning
+                cleanReplacements: [],
+                cleanAttrs: [],
+                cleanTags: [],
+                unwrapTags: [],
+
+                //custom object, see extension.js
+                acceptedStyles: acceptedPastedStyles,
+                inlineEditor: inline
+            };
+
+            //overwrite the default paste extension with our custom overloaded version (see extensions.js)
+            MediumEditor.extensions.paste = Extensions.PasteHandlerExt;
+        }
+        else {
+            options.paste = {
+                //note: default is the force plain text (true)
+                forcePlainText: true,
+                //we need to activate this to activate our custom paste plugin in extensions.js
+                cleanPastedHTML: false,
+            };
+        }
 
         //overwrite the removeFormat button because we want it to remove the formatting more agressively
         //note that all builtin buttons are represented by the same object and have 'action' properties
         //to distinguish between them, so we need to override that pase object and differentiate
         //in the handleClick() event handler
         MediumEditor.extensions.button = Extensions.ButtonExt;
-
-        //overwrite the default paste extension with our custom overloaded version (see extensions.js)
-        MediumEditor.extensions.paste = Extensions.PasteHandlerExt;
 
         //install our own link form extension
         options.extensions[Extensions.LinkInput.NAME] = new Extensions.LinkInput({});
