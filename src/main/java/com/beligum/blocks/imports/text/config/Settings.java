@@ -16,24 +16,25 @@
 
 package com.beligum.blocks.imports.text.config;
 
+import com.beligum.blocks.imports.commons.config.AbstractImportsSettings;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * Created by bram on 12.06.17.
  */
-public class Settings
+public class Settings extends AbstractImportsSettings
 {
     //-----CONSTANTS-----
+    private static final String TAG_NAME = "blocks-text";
     private static final String COMMON_PREFIX = "blocks.imports.text";
-    private static final String STYLES_PREFIX = COMMON_PREFIX + ".styles";
 
     //-----VARIABLES-----
     private static Settings instance;
-    private String cachedSylesMapJson;
 
     //-----CONSTRUCTORS-----
     private Settings()
     {
+        super(COMMON_PREFIX, TAG_NAME);
     }
     public static Settings instance()
     {
@@ -44,14 +45,6 @@ public class Settings
     }
 
     //-----PUBLIC METHODS-----
-    public String getStylesMapJson()
-    {
-        if (this.cachedSylesMapJson == null) {
-            this.cachedSylesMapJson = com.beligum.blocks.imports.commons.config.Settings.instance().getConstantsJsonMap(STYLES_PREFIX + ".style");
-        }
-
-        return this.cachedSylesMapJson;
-    }
 
     //-----PROTECTED METHODS-----
 
