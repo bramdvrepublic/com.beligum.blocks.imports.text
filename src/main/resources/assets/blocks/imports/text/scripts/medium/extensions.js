@@ -643,13 +643,24 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 if (elNode) {
                     var el = $(elNode);
 
-                    //detect inline mode and add a <p> to the text if we're
-                    //dealing with full-html editing
-                    if (this.base.options.disableReturn) {
-                        el.replaceWith(el.text());
+                    //if the common parent element is the editor element, handle it differently
+                    if (elNode != this.base.elements[0]) {
+                        //detect inline mode and add a <p> to the text if we're
+                        //dealing with full-html editing
+                        if (this.base.options.disableReturn) {
+                            el.replaceWith(el.text());
+                        }
+                        else {
+                            el.replaceWith($('<p/>').html(el.text()));
+                        }
                     }
                     else {
-                        el.replaceWith($('</p>').html(el.text()));
+                        if (this.base.options.disableReturn) {
+                            el.html(el.text());
+                        }
+                        else {
+                            el.html('<p>' + el.text() + '</p>');
+                        }
                     }
 
                     //this is a chance to delete left-over (and undeletable) empty tags
@@ -744,19 +755,21 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             this._insertHTML(container);
         },
-        _filterHtml: function(html)
+        _filterHtml: function (html)
         {
             //note: parseHTML() returns an array of (raw) dom nodes
             var retVal = $('<div/>');
 
             //var domTags = $.parseHTML('Dit is een test <h1>Met een hoofd</h1> <p> en <b>een</b> paragraaf</p>');
             var domTags = $.parseHTML(html);
-            for (var i = 0; i < domTags.length; i++) {
-                var node = domTags[i];
+            if (domTags) {
+                for (var i = 0; i < domTags.length; i++) {
+                    var node = domTags[i];
 
-                var filteredNode = this._filterElementsRecursively($(node));
-                if (filteredNode) {
-                    retVal.append(filteredNode);
+                    var filteredNode = this._filterElementsRecursively($(node));
+                    if (filteredNode) {
+                        retVal.append(filteredNode);
+                    }
                 }
             }
 
@@ -984,13 +997,12 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 //it's eg. possible to paste a <p> inside a <h1> and
                 //we don't want that, except when the parent element is the editor.
                 var parentNode = range.commonAncestorContainer;
-                var parentEl = parentNode;
-                while (parentEl.nodeName.indexOf('#') != -1) {
-                    parentEl = parentEl.parentNode;
+                while (parentNode.nodeName.indexOf('#') != -1) {
+                    parentNode = parentNode.parentNode;
                 }
 
-                var parent = $(parentEl);
-                if (Commons.isBlockElement(parent) && this.base.elements[0] != parentEl) {
+                var parent = $(parentNode);
+                if (Commons.isBlockElement(parent) && this.base.elements[0] != parentNode) {
                     //note that if we just created a new paragraph where the new text
                     //needs to be placed, we'll be in a <p><br></p> parent.
                     //So let's skip the cleaning because it's sort of the whole
