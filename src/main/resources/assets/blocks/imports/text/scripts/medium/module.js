@@ -23,7 +23,7 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
 
     var mediumEditor = null;
 
-    //If you change these, make sure to review the acceptedPastedStyles below!
+    //If you change these, make sure to review the acceptedRules below!
     var toolbarButtons = [Extensions.StylesPicker.NAME, 'bold', 'italic', 'underline', /*'strikethrough',*/ 'superscript', Extensions.LinkInput.NAME, 'orderedlist', 'unorderedlist', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'removeFormat'];
     var toolbarButtonsInline = ['bold', 'italic', 'underline', 'superscript', Extensions.LinkInput.NAME, 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'removeFormat'];
 
@@ -67,26 +67,47 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         // - there's a special '*' wildcard tag name that points to attributes that are allowed for all tags
 
         //sync this with the list of toolbar buttons above
-        var acceptedPastedStyles = {
+        var acceptedRules = {
             '*': {
-                'style': [
-                    'text-align: left',
-                    'text-align: center',
-                    'text-align: right',
-                ]
+                attrs: {
+                    style: [
+                        'text-align: left',
+                        'text-align: center',
+                        'text-align: right',
+                    ]
+                },
+                children: {
+                    'b': '*',
+                    'i': '*',
+                    'u': '*',
+                    'sup': '*',
+                    'strike': '*',
+                    'a': '*',
+                    'span': '*',
+                }
             },
             'p': {
                 //no special attributes allowed
             },
             'span': {
-                'style': [
-                    //this undos the <b> tag in case a parent has already made it bold
-                    'font-weight: normal',
-                    //same for <i>
-                    'font-style: normal',
-                    //same for <u>
-                    'text-decoration: none',
-                ]
+                attrs: {
+                    style: [
+                        //this undos the <b> tag in case a parent has already made it bold
+                        'font-weight: normal',
+                        //same for <i>
+                        'font-style: normal',
+                        //same for <u>
+                        'text-decoration: none',
+                    ]
+                },
+                children: {
+                    'b': '*',
+                    'i': '*',
+                    'u': '*',
+                    'sup': '*',
+                    'strike': '*',
+                    'a': '*',
+                }
             },
             'b': {
                 //no special attributes allowed
@@ -104,16 +125,31 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
                 //no special attributes allowed
             },
             'a': {
-                'href': '*',
-                'target': '_blank',
-                //these get set by the Medium Editor anchor extension (the parent of our link-input)
-                'rel': 'noopener noreferrer'
+                attrs: {
+                    href: '*',
+                    target: '_blank',
+                    //these get set by the Medium Editor anchor extension (the parent of our link-input)
+                    rel: 'noopener noreferrer'
+                },
+                children: {
+                    'b': '*',
+                    'i': '*',
+                    'u': '*',
+                    'sup': '*',
+                    'strike': '*',
+                }
             },
             'ol': {
                 //no special attributes allowed
+                children: {
+                    'li': '*',
+                }
             },
             'ul': {
                 //no special attributes allowed
+                children: {
+                    'li': '*',
+                }
             },
             'li': {
                 //no special attributes allowed
@@ -153,13 +189,13 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
                         //
 
                         // add the tag if it's not already there
-                        if (!(tag in acceptedPastedStyles)) {
-                            acceptedPastedStyles[tag] = {};
+                        if (!(tag in acceptedRules)) {
+                            acceptedRules[tag] = {};
                         }
 
                         //if we have a class value, we need to add it as well
                         if (clazz) {
-                            var tagRef = acceptedPastedStyles[tag];
+                            var tagRef = acceptedRules[tag];
                             //watch out: don't overwrite possible existing values
                             if ('class' in tagRef) {
                                 //convert to an array if not yet the case
@@ -181,19 +217,18 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         if (enablePasteHtml) {
 
             options.paste = {
-                //note: default is the force plain text (true)
+                //note: default is the force plain text (true), explicitly change it
                 forcePlainText: false,
-
                 //we need to activate this to activate our custom paste plugin in extensions.js
                 cleanPastedHTML: true,
-                //these indicate no more cleaning is to be done by the internal html cleaning
+                //these indicate no more cleaning is to be done by the internal html cleaning (we'll do all the cleaning)
                 cleanReplacements: [],
                 cleanAttrs: [],
                 cleanTags: [],
                 unwrapTags: [],
 
-                //custom object, see extension.js
-                acceptedStyles: acceptedPastedStyles,
+                //some custom objects, see extension.js
+                acceptedRules: acceptedRules,
                 inlineEditor: inline
             };
 
@@ -204,7 +239,6 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
             options.paste = {
                 //note: default is the force plain text (true)
                 forcePlainText: true,
-                //we need to activate this to activate our custom paste plugin in extensions.js
                 cleanPastedHTML: false,
             };
         }

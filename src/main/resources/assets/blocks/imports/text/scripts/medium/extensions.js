@@ -688,61 +688,79 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         {
             MediumEditorExtensions.PasteHandlerExt.Super.call(this, options);
 
-            this.acceptedStyles = options.acceptedStyles;
+            this.acceptedRules = options.acceptedRules;
             this.inlineEditor = options.inlineEditor;
 
             //we'll iterate over the values and make everything an array to smooth processing later on
             //also, we'll link the general styles into the specific styles so we don't have to differentiate
-            var generalAttrs = this.acceptedStyles['*'];
+            var generalRules = this.acceptedRules['*'];
+            var generalAttrs = generalRules ? generalRules.attrs : null;
+            var generalChildren = generalRules ? generalRules.children : null;
             //note: we always need at least a <p>, because it
             //represents the replacement containers for block text
             //so we add it if it's not there
-            var hasP = false;
+            var hasPAttrs = false;
             var _this = this;
-            $.each(this.acceptedStyles, function (tagName, attrs)
+            $.each(this.acceptedRules, function (tagName, rules)
             {
                 //uniformize
                 var tagNameLower = tagName.toLowerCase();
 
-                //if we're dealing with an inline editor,
-                //we need to remove all blocks or we'll end up with invalid states
-                if (options.inlineEditor && Commons.isBlockElement(tagNameLower)) {
-                    delete _this.acceptedStyles[tagName];
-                }
-                else {
-
-                    if (!hasP && tagNameLower == 'p') {
-                        hasP = true;
-                    }
-
-                    $.each(attrs, function (attr, value)
+                var acceptedAttrs = rules.attrs;
+                if (acceptedAttrs) {
+                    $.each(acceptedAttrs, function (attrName, attrValues)
                     {
-                        if (!$.isArray(value)) {
-                            attrs[attr] = [value];
+                        //if we're dealing with an inline editor,
+                        //we need to remove all blocks or we'll end up with invalid states
+                        if (options.inlineEditor && Commons.isBlockElement(tagNameLower)) {
+                            delete _this.acceptedRules[tagName].attrs;
+                        }
+                        else {
+
+                            if (!hasPAttrs && tagNameLower == 'p') {
+                                hasPAttrs = true;
+                            }
+
+                            //uniformize: convert all values to an array
+                            if (!$.isArray(attrValues)) {
+                                attrValues = [attrValues];
+                            }
+
+                            if (tagNameLower != '*' && generalAttrs) {
+                                $.each(generalAttrs, function (generalStyleAttr, generalValue)
+                                {
+                                    if (generalStyleAttr in attrValues) {
+                                        //append the general array to the existing array
+                                        //note that this might possibly double allowed values,
+                                        //but that's not such a big deal, right?
+                                        for (var i = 0; i < generalValue.length; i++) {
+                                            attrValues[generalStyleAttr].push(generalValue[i]);
+                                        }
+                                    }
+                                    else {
+                                        attrValues[generalStyleAttr] = generalValue;
+                                    }
+                                });
+                            }
+
+                            //we might have tampered with it
+                            _this.acceptedRules[tagName].attrs[attrName] = attrValues;
                         }
                     });
-
-                    if (tagNameLower != '*' && generalAttrs) {
-                        $.each(generalAttrs, function (generalAttr, generalValue)
-                        {
-                            if (generalAttr in attrs) {
-                                //append the general array to the existing array
-                                //note that this might possibly double allowed values,
-                                //but that's not such a big deal, right?
-                                for (var i = 0; i < generalValue.length; i++) {
-                                    attrs[generalAttr].push(generalValue[i]);
-                                }
-                            }
-                            else {
-                                attrs[generalAttr] = generalValue;
-                            }
-                        });
-                    }
                 }
+
+                var acceptedChildren = rules.children;
+                if (tagNameLower != '*' && generalChildren && !acceptedChildren) {
+                    rules.children = generalChildren;
+                }
+
             });
 
-            if (!hasP && !options.inlineEditor) {
-                this.acceptedStyles['p'] = generalAttrs || {};
+            if (!hasPAttrs && !options.inlineEditor) {
+                this.acceptedRules['p'] = {
+                    attrs: generalAttrs,
+                    children: generalChildren
+                };
             }
         },
 
@@ -751,9 +769,108 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         {
             var _this = this;
 
-            var container = this._filterHtml(html);
+            var editor = this.base.elements[0];
+            var editorEl = $(editor);
 
-            this._insertHTML(container);
+            var selectedHtml = MediumEditor.selection.getSelectionHtml(this.document);
+            var allSelected = selectedHtml.trim() == editorEl.html().trim();
+
+            var selection = this.document.getSelection();
+            var hasSelection = !selection.isCollapsed;
+
+            // This is a handy extra pre-clean to get around the wrapping-first-tag problem
+            // When selecting everything (eg. this: <h1>title</h1><p>text</p>) and pasting,
+            // the pasted html will end up in the first tag, wrapping everything in a <h1>.
+            // It's annoying when selecting all because it's counter-intuitive.
+            if (allSelected) {
+                //Update: don't do this, because it basically does the same (keeps the <h1>)
+                // if (this.document.queryCommandSupported('delete')) {
+                //     this.document.execCommand('delete', false, null);
+                // }
+                // else {
+                this.base.setContent('');
+                // }
+            }
+            else {
+
+                //if we have nothing selected (the cursor is just placed somewhere),
+                //this would stop the paste from happening, so avoid that
+                if (hasSelection) {
+
+                    //this helps a lot in removing any whitespace from the start and end of the selection
+                    //and especially when using a triple-click on full paragraphs (which also selects the newline
+                    // up until just before the next tag). But note that this will
+                    //also trim the spaces from an eg. regular text section, yielding in a result where
+                    //the selected space will be unselected before the paste is done, which feels unnatural.
+                    //But for now, the benefits of the first case are more important.
+                    //Update: we modified this to trimEnd() (instead of just trim()) and introduced a check
+                    //for a text node at the end of the selection, resulting is more natural behavior for the
+                    //case described above.
+                    if (selection.focusNode && selection.focusNode.nodeType == 1 && selection.focusOffset == 0) {
+
+                        //the idea here is to create a list of selected nodes we can iterate (backwards)
+                        //to find the focusNode in that list
+                        var range = selection.getRangeAt(0);
+                        var selectionParentEl = $(range.commonAncestorContainer);
+                        var selectionParentChildren = selectionParentEl.contents();
+                        var focusNodeIdx = -1;
+                        for (var i = selectionParentChildren.length; i >= 0; i--) {
+                            var child = selectionParentChildren[i];
+                            if (child == selection.focusNode) {
+                                focusNodeIdx = i;
+                                break;
+                            }
+                        }
+
+                        //if we found the node (this should always happen),
+                        //try to skim off as much blank nodes as possible (the spaces+newline nodes)
+                        //and stop if we find a non-empty one
+                        if (focusNodeIdx > 0) {
+                            var newFocusNode = selectionParentChildren[focusNodeIdx];
+                            for (var i = focusNodeIdx - 1; i >= 0; i--) {
+                                var node = selectionParentChildren[i];
+                                if (node.textContent.trim() != '') {
+                                    newFocusNode = node;
+                                    break;
+                                }
+                            }
+
+                            //range.setEnd() doesn't accept tags, it needs text nodes
+                            if (newFocusNode.nodeType == 1) {
+                                newFocusNode = newFocusNode.lastChild;
+                            }
+
+                            //only if we have a new focus that's a text node,
+                            //set the new focus
+                            if (newFocusNode && newFocusNode.nodeType == 3) {
+                                //I guess these two do the same thing
+                                range.setEnd(newFocusNode, newFocusNode.textContent.length);
+                                //selection.extend(newFocusNode, newFocusNode.textContent.length);
+                            }
+                        }
+                    }
+                }
+            }
+
+            //TODO restore selection; doesn't work yet, we'll have to implement our own undo/redo
+            //this.base.saveSelection();
+
+            //two options
+            var USE_DIRECT_PASTING = false;
+            if (USE_DIRECT_PASTING) {
+                MediumEditor.util.insertHTMLCommand(this.document, html.replace(/&nbsp;/g, ' '));
+            }
+            else {
+                MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, html, options);
+            }
+
+            //when all is pasted (note that the browser sometimes adds extra arguments, even when
+            // the supplied html is cleaned up), we filter the entire editor to make sure it's all cleaned
+            var filteredHtmlContainer = this._filterHtml(editorEl.html());
+            var filteredHtml = filteredHtmlContainer.html();
+            this.base.setContent(filteredHtml);
+
+            //this.base.restoreSelection();
         },
         _filterHtml: function (html)
         {
@@ -808,71 +925,53 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             var nodeName = el[0].nodeName;
             var isTextNode = nodeName.indexOf('#') == 0;
             if (isTextNode || el.html().trim() != '') {
+
+                var isAllowedInParent = true;
+                var parentRules = null;
+                if (!isTextNode) {
+                    var parent = el.parent();
+                    //if we don't have a parent or the parent is the editor, it's always okay
+                    if (parent.length > 0 && parent[0] != this.base.elements[0]) {
+                        parentRules = this.acceptedRules[parent[0].nodeName.toLowerCase()];
+                        if (parentRules && parentRules.children) {
+                            if (!parentRules.children[nodeName]) {
+                                isAllowedInParent = false;
+                            }
+                        }
+                        //if we have a parent and there are no rules, it's not allowed
+                        else {
+                            isAllowedInParent = false;
+                        }
+                    }
+                }
+
                 //note: compared to tagName, nodeName also returns something for eg #text, #comment, etc.
                 //note that this means free-standing text (not surrounded by an element), will be removed
                 //if nothing is set in the rules for the tag '#text'
                 //Also note that all node names in the style rules must be lowercase
-                var tagRules = this.acceptedStyles[nodeName.toLowerCase()];
+                var tagRules = this.acceptedRules[nodeName.toLowerCase()];
 
                 //if we find rules for this tag, this means it's allowed,
                 //we just need to filter it's attributes
-                if (tagRules) {
-                    this._filterAttributes(el, tagRules);
+                if (isAllowedInParent && tagRules) {
+                    this._filterAttributes(el, tagRules.attrs);
                     retVal = el;
                 }
                 //if this tag is not allowed, we textify it, trying to preserve 'blocks'
                 else {
-                    //Note: creating a span here isn't the right solution,
-                    // we just want to convert it to a text node,
-                    // so the editor's content won't be cluttered with
-                    // a bunch of <span> wrapped text
-                    var textContent = el.text();
-
-                    //leave the retVal at null if the text is empty
-                    if (textContent.trim() != '') {
-
-                        //Note: if we convert a block element to an inline element because we're in
-                        //inline mode, we need to append a space too, because this would
-                        //join the texts of two blocks together without spacing.
-                        //This means the last one will have a trailing space, but I can live with that
-                        var isBlock = !isTextNode && (el.css('display') == 'block' || Commons.isBlockElement(el));
-                        if (this.inlineEditor || isBlock) {
-                            textContent += ' ';
-                        }
-
-                        //from the text(string) docs:
-                        // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
-                        retVal = $('<p/>').text(textContent);
-                    }
+                    retVal = this._textify(el, isTextNode, parentRules);
                 }
             }
 
             if (retVal) {
-                //these are two cleaning methods we took over from the parent method
-                //(to be found with: MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);)
-                if (typeof retVal === 'string' || retVal instanceof String) {
-                    //no need to cleanup spans when we're a string
-                    retVal = retVal.replace(/&nbsp;/g, ' ');
-                }
-                //when it's not a string, it's a jquery element
-                else {
-
-                    //this will probably be just one
-                    for (var i = 0; i < retVal.length; i++) {
-                        if (retVal[i]) {
-                            this.cleanupSpans(retVal[i]);
-                        }
-                    }
-
-                    retVal.html(retVal.html().replace(/&nbsp;/g, ' '));
-                }
+                retVal = this._cleanup(retVal);
             }
 
             return retVal;
         },
-        _filterAttributes: function (el, tagRules)
+        _filterAttributes: function (el, allowedAttrs)
         {
-            if (tagRules) {
+            if (allowedAttrs) {
 
                 //iterate the attributes (using plain JS) of the element
                 //and remove everything that's not allowed
@@ -891,7 +990,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     var attrName = attrs[i].name;
                     var attrValue = attrs[i].value;
 
-                    var attrRules = tagRules[attrName];
+                    var attrRules = allowedAttrs[attrName];
                     //if the attribute is in the rules, we keep it and start
                     //processing it's value
                     if (attrRules) {
@@ -944,162 +1043,84 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 }
             }
         },
-        /**
-         * This is basically our own implementation of the standard insertHTML() command
-         * because we wanted to be able to control it more tightly.
-         * We started out with the insertHTMLCommand() in the Medium Editor source code,
-         * and pulled in the Rangy library for more control over the selected text.
-         */
-        _insertHTML: function (htmlContainer)
+        _textify: function (el, isTextNode, parentRules)
         {
-            //note: we switched to using the Rangy library for managing the selection,
-            //because it frees us from a lot of headache
-            var sel = rangy.getSelection();
+            var retVal = null;
 
-            if (sel.rangeCount > 0) {
+            //Note: creating a span here isn't the right solution,
+            // we just want to convert it to a text node,
+            // so the editor's content won't be cluttered with
+            // a bunch of <span> wrapped text
+            var textContent = el.text();
 
-                //this helps a lot in removing any whitespace from the start and end of the selection
-                //and especially when using a triple-click on full paragraphs (which also selects the newline
-                // up until just before the next tag). But note that this will
-                //also trim the spaces from an eg. regular text section, yielding in a result where
-                //the selected space will be unselected before the paste is done, which feels unnatural.
-                //But for now, the benefits of the first case are more important.
-                //Update: we modified this to trimEnd() (instead of just trim()) and introduced a check
-                //for a text node at the end of the selection, resulting is more natural behavior for the
-                //case described above.
-                if (sel.focusNode && sel.focusNode.nodeName && sel.focusNode.nodeName != '#text') {
-                    //if we have nothing selected (the cursor is just placed somewhere),
-                    //this would stop the paste from happening, so avoid that
-                    var noSelection = sel.focusNode == sel.anchorNode && sel.focusOffset == 0 && sel.anchorOffset == 0;
-                    if (!noSelection) {
-                        sel.trimEnd();
+            //leave the retVal at null if the text is empty
+            if (textContent.trim() != '') {
+
+                //Note: if we convert a block element to an inline element because we're in
+                //inline mode, we need to append a space too, because this would
+                //join the texts of two blocks together without spacing.
+                //This means the last one will have a trailing space, but I can live with that
+                var isBlock = !isTextNode && (el.css('display') == 'block' || Commons.isBlockElement(el));
+                if (this.inlineEditor || isBlock) {
+                    textContent += ' ';
+                }
+
+                var isPAllowedInParent = true;
+                if (parentRules && parentRules.children) {
+                    if (!parentRules.children['p']) {
+                        isPAllowedInParent = false;
                     }
                 }
-
-                //note that normal use only supports one selection
-                var range = sel.getRangeAt(0);
-
-                //this is a workaround for a bug in chrome and others:
-                //when triple-clicking a line (eg. a <h1>, the entire line gets selected,
-                //but secretly, the beginning of the next line as well. If you paste something,
-                //the text is placed on the next line, but the first empty <h1> is kept around
-                //for unknown reasons.
-                //Our solution is to ask for all the nodes that are selected before executing
-                //the deleteContents() and iterating them afterwards, deleting all the nodes
-                //that still exist and are empty
-                //Update: we don't do this anymore because we wipe _all_ empty tags, see below
-                //var nodes = range.getNodes();
-
-                //first the first parent element around the selection
-                //If it's a block element and the pasted code is also
-                //wrapped by a block element, we'll need to strip
-                //the blocks from the pasted html because otherwise
-                //it's eg. possible to paste a <p> inside a <h1> and
-                //we don't want that, except when the parent element is the editor.
-                var parentNode = range.commonAncestorContainer;
-                while (parentNode.nodeName.indexOf('#') != -1) {
-                    parentNode = parentNode.parentNode;
-                }
-
-                var parent = $(parentNode);
-                if (Commons.isBlockElement(parent) && this.base.elements[0] != parentNode) {
-                    //note that if we just created a new paragraph where the new text
-                    //needs to be placed, we'll be in a <p><br></p> parent.
-                    //So let's skip the cleaning because it's sort of the whole
-                    //point of allowing to paste formatted code in a new paragraph.
-                    if (parent.text() != '') {
-                        //these are all top-level children
-                        var children = htmlContainer.children();
-                        children.each(function (index)
-                        {
-                            var child = $(this);
-                            while (child.length > 0 && Commons.isBlockElement(child)) {
-                                var childInner = child.html();
-                                child.replaceWith(childInner);
-                                child = childInner;
-                            }
-                        });
-                    }
-                }
-
-                //Now do the real pasting of the new cleaned html
-                //but note that non-builtin pasting doesn't have undo...
-                var USE_BUILTIN_PASTING = true;
-                if (USE_BUILTIN_PASTING) {
-
-                    MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, htmlContainer.html(),
-                        // we make this empty because the whole point is we did this part outself
-                        {
-                            cleanAttrs: [],
-                            cleanTags: [],
-                            unwrapTags: []
-                        }
-                    );
-                    //this is the naked version of the command above if we'd ever need it
-                    //MediumEditor.util.insertHTMLCommand(this.document, htmlContainer[0].innerHTML.replace(/&nbsp;/g, ' '));
-
-                    var DO_EXTRA_CLEANUP = true;
-
-                    if (DO_EXTRA_CLEANUP) {
-
-                        var unfilteredHtml = parent.html();
-                        //note that _filterHtml() wraps the result in a container, so unwrap it again with html()
-                        var filteredHtml = this._filterHtml(unfilteredHtml).html();
-
-                        //note: this is the part that messes up the undo/redo,
-                        //so don't do it if it's not needed
-                        if (unfilteredHtml != filteredHtml) {
-
-                            //Disabled for now: threw errors sometimes?
-                            //needed to keep selection after cleanup below
-                            this.base.saveSelection();
-
-                            //The builtin 'insertHTML' command introduces too many own styling
-                            // (like automatically inserting span styles with 'font-style: normal' when they come after a <a> in a <h1>)
-                            //so we'll need to re-clean it! Only problem is that if we undo this and redo it afterwards, it will
-                            //redo with the unprocessed html but we can live with that
-                            parent.html(filteredHtml);
-
-                            this.base.restoreSelection();
-                        }
-                    }
-                }
-                //use Rangy pasting instead: note that we lose undo/redo functionality
+                //if we have a parent and there are no rules, it's not allowed
                 else {
-                    range.pasteHtml(htmlContainer.html());
+                    isPAllowedInParent = false;
                 }
 
-                //Update: see above why this is commented
-                // //see comments above, this is the second part
-                // for (var i = 0; i < nodes.length; i++) {
-                //     var n = nodes[i];
-                //     if (n && n.tagName) {
-                //         var nEl = $(n);
-                //         if (nEl.is(':empty')) {
-                //             nEl.remove();
-                //         }
-                //     }
-                // }
-
-                //some aftermath cleanup
-                //we get in trouble when empty tags get pasted because they're
-                //not always selectable (and thus undeletable), so we get rid of them
-                //Note that this won't delete tags with text nodes, which is okay
-                parent.find(':empty').remove();
+                if (isPAllowedInParent) {
+                    //from the text(string) docs:
+                    // We need to be aware that this method escapes the string provided as necessary so that it will render correctly in HTML.
+                    retVal = $('<p/>').text(textContent);
+                }
+                else {
+                    retVal = textContent;
+                }
             }
 
-            //note: as for undo/redo history, see this for more info:
-            //https://stackoverflow.com/questions/28217539/allowing-contenteditable-to-undo-after-dom-modification
-            //For now, we can't undo after pasting :-(
-            //TODO see https://addyosmani.com/blog/mutation-observers/
-        }
+            return retVal;
+        },
+        _cleanup: function (node)
+        {
+            if (node) {
+                //these are two cleaning methods we took over from the parent method
+                //(to be found with: MediumEditorExtensions.PasteHandlerExt.Super.prototype.pasteHTML.call(this, container.html(), options);)
+                if (typeof node === 'string' || node instanceof String) {
+                    //no need to cleanup spans when we're a string
+                    node = node.replace(/&nbsp;/g, ' ');
+                }
+                //when it's not a string, it's a jquery element
+                else {
 
-        //do we need this? Don't think so, it's handled in the updatePlaceholder() of admin.js now
-        // // https://github.com/yabwe/medium-editor/issues/992
-        // // If we're monitoring calls to execCommand, notify listeners as if a real call had happened
-        // if (this.document.execCommand.callListeners) {
-        //     this.document.execCommand.callListeners(['insertHTML', false, html], retVal);
-        // }
+                    //this will probably be just one
+                    for (var i = 0; i < node.length; i++) {
+                        if (node[i]) {
+                            this.cleanupSpans(node[i]);
+                        }
+                    }
+
+                    //here, we take the time to delete empty tags;
+                    //meaning tags with nothing or only blank as content
+                    var newHtml = node.html().replace(/&nbsp;/g, ' ');
+                    if (newHtml.trim() == '') {
+                        node = null;
+                    }
+                    else {
+                        node.html();
+                    }
+                }
+            }
+
+            return node;
+        },
     });
 
 }]);
