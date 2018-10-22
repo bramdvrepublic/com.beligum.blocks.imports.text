@@ -224,7 +224,7 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
                 //these indicate no more cleaning is to be done by the internal html cleaning (we'll do all the cleaning)
                 cleanReplacements: [],
                 cleanAttrs: [],
-                cleanTags: [],
+                cleanTags: ['meta'],
                 unwrapTags: [],
 
                 //some custom objects, see extension.js

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
+base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.core.Undo", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Undo, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
 {
     var Text = this;
     this.TAGS = ["blocks-text div", "blocks-text span"];
@@ -121,7 +121,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             // pages (eg. when the editor saves a page with no content).
             //
             // The rest of this is implemented in main.less
-            var updatePlaceholder = function (event, rawEditorElement)
+            var updatePlaceholder = function ()
             {
                 if (element.text().trim().length == 0) {
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
@@ -176,6 +176,44 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                     element.removeClass(ImportsConstants.COMMONS_EMPTY_CLASS);
                 }
             };
+
+            var changeTimer = null;
+            var changeStartHtml = element.html();
+            var handleChange = function (e)
+            {
+                //don't record changes that happen _inside_ the undo event
+                if (!Undo.isInsideUndoRedo(element)) {
+
+                    var newHtml = element.html();
+                    if (!inlineEditor && newHtml.trim() == '') {
+                        newHtml = '<p><br></p>';
+                    }
+
+                    //don't record non-changes
+                    if (newHtml != changeStartHtml) {
+
+                        Undo.recordHtmlChange(element, changeStartHtml,
+                            function (value, action, cmd)
+                            {
+                                updatePlaceholder();
+                            }
+                        );
+
+                        changeStartHtml = newHtml;
+                    }
+                }
+            };
+
+            //we have two options to listen for changes: a native JS one (which is triggered a lot)
+            //and a MediumEditor one. They both seem to work fine because we use amortization,
+            //but I decided to choose the MediumEditor one for now.
+            var USE_NATIVE_LISTENER = false;
+            if (USE_NATIVE_LISTENER) {
+                element.on("DOMSubtreeModified", handleChange);
+            }
+            else {
+                editor.subscribe('editableInput', handleChange);
+            }
 
             // See https://github.com/yabwe/medium-editor/blob/master/CUSTOM-EVENTS.md
             // editableInput is triggered whenever the content of a contenteditable changes,

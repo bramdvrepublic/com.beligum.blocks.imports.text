@@ -772,6 +772,12 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             var editor = this.base.elements[0];
             var editorEl = $(editor);
 
+            // var parentBlock = editorEl.parents().filter(function(index, element) {
+            //     return element.nodeType == Node.ELEMENT_NODE && element.nodeName.indexOf('-') !== -1;
+            // }).first();
+
+            var startHtml = editorEl.html();
+
             var selectedHtml = MediumEditor.selection.getSelectionHtml(this.document);
             var allSelected = selectedHtml.trim() == editorEl.html().trim();
 
@@ -788,7 +794,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 //     this.document.execCommand('delete', false, null);
                 // }
                 // else {
-                this.base.setContent('');
+                this.base.setContent('<p><br></p>');
                 // }
             }
             else {
@@ -850,6 +856,8 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                         }
                     }
                 }
+
+
             }
 
             //TODO restore selection; doesn't work yet, we'll have to implement our own undo/redo
