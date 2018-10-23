@@ -192,7 +192,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                     //don't record non-changes
                     if (newHtml != changeStartHtml) {
 
-                        Undo.recordHtmlChange(element, changeStartHtml,
+                        Undo.recordHtmlChange(element, changeStartHtml, null, null, null,
                             function (value, action, cmd)
                             {
                                 updatePlaceholder();
