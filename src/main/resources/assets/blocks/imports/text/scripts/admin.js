@@ -177,7 +177,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 }
             };
 
-            var changeTimer = null;
             var changeStartHtml = element.html();
             var handleChange = function (e)
             {
