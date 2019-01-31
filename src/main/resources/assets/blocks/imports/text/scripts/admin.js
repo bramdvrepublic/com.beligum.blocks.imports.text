@@ -247,16 +247,18 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             editor.subscribe('blur', updatePlaceholder);
 
             //put the cursor where we clicked
-            //Update: this seems to be a better solution...
-            this._setCursor(event.originalEvent.clientX, event.originalEvent.clientY);
-            //this._setCursor(hotspot.left, hotspot.top);
+            this._setCursor(event.pageX, event.pageY);
 
-            // Add toolbar to sidebar
+            // Add custom styling to the toolbar
             var toolbar = $(Editor.getToolbarElement());
             if (toolbar) {
                 toolbar.addClass(BlocksConstants.PREVENT_BLUR_CLASS);
                 //make sure, if we click the toolbar, the block-window doesn't pop up
                 toolbar.attr(BlocksConstants.CLICK_ROLE_ATTR, BlocksConstants.FORCE_CLICK_ATTR_VALUE);
+
+                //TODO this will be overwritten, check it
+                // toolbar.css('top', block.top+'px');
+                // toolbar.css('left', block.left+'px');
             }
         },
         blur: function (block, element)
