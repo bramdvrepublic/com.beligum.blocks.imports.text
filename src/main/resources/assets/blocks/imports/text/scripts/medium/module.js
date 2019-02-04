@@ -42,7 +42,7 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         return retVal;
     };
 
-    this.getEditor = function (element, inline, hideToolbar, enablePasteHtml)
+    this.getEditor = function (container, element, inline, hideToolbar, enablePasteHtml)
     {
         if (mediumEditor != null) {
             MediumModule.removeEditor();
@@ -256,10 +256,12 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
             var toolbarOptions = {
                 //enable the toolbar always displaying in the same location relative to the medium-editor element.
                 static: true,
+                //this enables/disables the toolbar "sticking" to the viewport and staying visible on the screen while the page scrolls.
+                sticky: true,
                 //this enables updating the state of the toolbar buttons even when the selection is collapsed (there is no selection, just a cursor)
                 updateOnEmptySelection: true,
                 buttons: toolbarButtons,
-                align: 'left'
+                align: 'left',
             };
 
             if (inline) {
@@ -279,6 +281,18 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         options.disablePlaceholders = true;
 
         mediumEditor = new MediumEditor(element[0], options);
+
+        //when the toolbar is created and there's a difference between the container
+        //and the editor element, align them with margins (because top/left are overridden by medium editor)
+        if (!hideToolbar && container !== element) {
+            var toolbar = $(this.getToolbarElement());
+            if (toolbar) {
+                var elPos = element.offset();
+                var conPos = container.offset();
+                toolbar.css('margin-left', (conPos.left - elPos.left)+'px');
+                toolbar.css('margin-top', (conPos.top - elPos.top)+'px');
+            }
+        }
 
         return mediumEditor;
     };

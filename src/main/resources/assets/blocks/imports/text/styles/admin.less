@@ -101,10 +101,6 @@
   }
 }
 
-.medium-editor-hidden {
-  display: none;
-}
-
 .medium-editor-toolbar {
   position: absolute;
   visibility: hidden;
@@ -113,7 +109,7 @@
   top: 0;
   left: 0;
   //needed to align the toolbar with the dotted border of the active block
-  margin-left: -1px;
+  //margin-left: -1px;
 
   ul.medium-editor-toolbar-actions {
     .btn-group();
@@ -151,6 +147,14 @@
 .medium-editor-sticky-toolbar {
   position: fixed;
   top: 1px;
+  //TODO
+  //this overloads the possible alignment between the
+  //container and the editor when the 'sticky mode' is activated
+  //margin-top: 0 !important;
+}
+
+.medium-editor-relative-toolbar {
+  position: relative;
 }
 
 .medium-editor-hidden {
@@ -234,7 +238,6 @@
       }
     }
   }
-
 }
 
 .medium-editor-toolbar-form-active {

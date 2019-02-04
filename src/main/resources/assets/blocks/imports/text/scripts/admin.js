@@ -31,9 +31,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         },
 
         //-----IMPLEMENTED METHODS-----
-        init: function ()
-        {
-        },
         focus: function (block, element, hotspot, event)
         {
             Text.Class.Super.prototype.focus.call(this, block, element, hotspot, event);
@@ -91,7 +88,9 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 }
             }
 
-            var editor = Editor.getEditor(element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR], TextConstants.ENABLE_PASTE_HTML_CONFIG == 'true');
+            //note that it makes sense to pass the overlay is the container element, because it will be used to calculate
+            //the position of the toolbar and we want to make it align properly to the overlay, nothing else
+            var editor = Editor.getEditor(block.overlay, element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR], TextConstants.ENABLE_PASTE_HTML_CONFIG == 'true');
 
             // Instead of relying on the standard placeholder functionality, we decided to implement our own:
             // The main problem is that Medium Editor activates the class medium-editor-placeholder on the editor element
@@ -124,6 +123,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             var updatePlaceholder = function ()
             {
                 if (element.text().trim().length == 0) {
+
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
 
                     //this is nice because it syncs the backspace with the delete button and resets everything
@@ -246,20 +246,30 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             editor.subscribe('focus', updatePlaceholder);
             editor.subscribe('blur', updatePlaceholder);
 
-            //put the cursor where we clicked
-            this._setCursor(event.pageX, event.pageY);
-
-            // Add custom styling to the toolbar
-            var toolbar = $(Editor.getToolbarElement());
-            if (toolbar) {
-                toolbar.addClass(BlocksConstants.PREVENT_BLUR_CLASS);
-                //make sure, if we click the toolbar, the block-window doesn't pop up
-                toolbar.attr(BlocksConstants.CLICK_ROLE_ATTR, BlocksConstants.FORCE_CLICK_ATTR_VALUE);
-
-                //TODO this will be overwritten, check it
-                // toolbar.css('top', block.top+'px');
-                // toolbar.css('left', block.left+'px');
-            }
+            // There are a number of issues with directly invoking some
+            // editor-element-related functions: mainly because this method is fired
+            // during 'mouseup' and the medium-editor does some initialization on 'click',
+            // more or less reverting (or messing up) the initialization we do here.
+            // That's why we chose to execute the final UI tweaks in a separate callback.
+            // var _this = this;
+            // setTimeout(function ()
+            // {
+            //     // Add custom styling to the toolbar
+            //     var toolbar = $(Editor.getToolbarElement());
+            //     if (toolbar) {
+            //         //make sure, if we click the toolbar, the block-window doesn't pop up
+            //         toolbar.attr(BlocksConstants.CLICK_ROLE_ATTR, BlocksConstants.FORCE_CLICK_ATTR_VALUE);
+            //
+            //         // toolbar.css('top', block.top + 'px');
+            //         // toolbar.css('left', block.left + 'px');
+            //
+            //         //toolbar.css('left', '100px');
+            //     }
+            //
+            //     //put the cursor where we clicked
+            //     _this._setCursor(event.clientX, event.clientY);
+            //
+            // }, 1000);
         },
         blur: function (block, element)
         {
