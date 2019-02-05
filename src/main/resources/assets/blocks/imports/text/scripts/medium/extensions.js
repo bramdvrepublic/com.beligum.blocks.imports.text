@@ -36,7 +36,10 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
     };
 
     //-----CLASS DEFINITIONS-----
-    //used this as a reference: https://github.com/arcs-/MediumButton
+    /**
+     * Extension to show a dropdown to select a paragraph style in the toolbar.
+     * Used this as a reference: https://github.com/arcs-/MediumButton
+     */
     this.StylesPicker = Class.create(MediumEditor.extensions.form, {
 
         //-----CONSTANTS-----
@@ -352,6 +355,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         }
     });
 
+    /**
+     * An extension to show an editable hyperlink form when an active link is clicked.
+     */
     this.LinkInput = Class.create(MediumEditor.extensions.anchor, {
 
         //-----CONSTANTS-----
@@ -607,12 +613,16 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             }
         }
 
-
-        //-----OWN FUNCTIONS-----
-
         //-----PRIVATE FUNCTIONS-----
     });
 
+    /**
+     * We overload the button extensions to overwrite the removeFormat button
+     * because we want it to remove the formatting more agressively.
+     * Note that all builtin buttons are represented by the same object and have 'action' properties
+     * to distinguish between them, so we need to override that pase object and differentiate
+     * in the handleClick() event handler
+     */
     this.ButtonExt = Class.create(MediumEditor.extensions.button, {
 
         //-----CONSTANTS-----
@@ -674,6 +684,10 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         },
     });
 
+    /**
+     * We're overloading the paste handler to be able to control text pasting
+     * a lot more intimately.
+     */
     this.PasteHandlerExt = Class.create(MediumEditor.extensions.paste, {
 
         //-----CONSTANTS-----
@@ -1129,6 +1143,91 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             return node;
         },
+    });
+
+    /**
+     * We're overloading the toolbar to be able to better control its placement
+     */
+    this.ToolbarExt = Class.create(MediumEditor.extensions.toolbar, {
+
+        //-----CONSTANTS-----
+        STATIC: {
+            NAME: "toolbar-ext"
+        },
+
+        //-----VARIABLES-----
+        anchorElement: undefined,
+        anchorBorderWidth: undefined,
+
+        //-----CONSTRUCTORS-----
+        constructor: function (options)
+        {
+            MediumEditorExtensions.ToolbarExt.Super.call(this, options);
+
+            //this is a custom element that's passed in to have more freedom regarding the positioning
+            //note: this is not a jQuery element, just a regular DOM element, so we'll parse it
+            this.anchorElement = $(options.anchorElement);
+            this.anchorBorderWidth = options.anchorBorderWidth ? parseFloat(options.anchorBorderWidth) : options.anchorBorderWidth;
+        },
+
+        //-----OVERLOADED FUNCTIONS-----
+        /**
+         * This method gets called when a static toolbar needs to be (re)positioned.
+         * If it's also a sticky toolbar, it gets called on window scroll as well.
+         */
+        positionStaticToolbar: function (container)
+        {
+            MediumEditorExtensions.ToolbarExt.Super.prototype.positionStaticToolbar.call(this, container);
+
+            //when the toolbar is created and there's a difference between the anchor
+            //and the editor element, make sure to align the two
+            var toolbarElement = this.getToolbarElement();
+            var toolbarElementQ = $(toolbarElement);
+            if (this.anchorElement && this.anchorElement !== toolbarElementQ) {
+
+                var anchorPos = this.anchorElement.offset();
+                var anchorHeight = this.anchorElement.outerHeight(true);
+
+                var containerTop = anchorPos.top;
+                var toolbarHeight = toolbarElementQ.outerHeight();
+
+                //default behavior is to just position the toolbar at the top left of the anchor
+                var top = containerTop - toolbarHeight;
+                var left = anchorPos.left;
+
+                // Note that this code is basically the same (jQuery-fied and anchor-fied) version of
+                // the superclass; it doesn't do anything else, so make sure it's synchronized.
+                if (this.sticky) {
+
+                    // copy/pasted from the superclass, beware of changes!
+                    var scrollTop = (this.document.documentElement && this.document.documentElement.scrollTop) || this.document.body.scrollTop;
+
+                    // the toolbar is above the scroll top (and therefore partly hidden), but we've also scrolled
+                    // past the container (actually not completely past, but the slice of container that's still
+                    // showing is not enough to fit the toolbar)
+                    if (scrollTop > (containerTop + anchorHeight - toolbarHeight - this.stickyTopOffset)) {
+                        toolbarElementQ.removeClass('medium-editor-sticky-toolbar');
+                        //align the toolbar with the bottom of the container
+                        top = containerTop + anchorHeight - toolbarHeight;
+                    }
+                    // the toolbar is above the scroll top (and therefore partly hidden), but the container
+                    // is still (partly) visible: just position it at the top of the page so it 'scrolls along'
+                    else if (scrollTop > (containerTop - toolbarHeight - this.stickyTopOffset)) {
+                        toolbarElementQ.addClass('medium-editor-sticky-toolbar');
+                        top = this.stickyTopOffset;
+                    }
+                    // normal behavior: make sure to reset the classes we could have set above
+                    else {
+                        toolbarElementQ.removeClass('medium-editor-sticky-toolbar');
+                    }
+                }
+
+                //overwrite the top and left with our adjusted values
+                toolbarElementQ.css('top', top + 'px');
+                toolbarElementQ.css('left', left + 'px');
+            }
+        },
+
     });
 
 }]);

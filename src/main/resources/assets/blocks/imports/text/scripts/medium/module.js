@@ -17,7 +17,7 @@
 /**
  * Created by wouter on 12/06/15.
  */
-base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", function (Extensions)
+base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.MediumEditorExtensions", function (BlocksConstants, Extensions)
 {
     var MediumModule = this;
 
@@ -249,19 +249,41 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         //in the handleClick() event handler
         MediumEditor.extensions.button = Extensions.ButtonExt;
 
+        //overwrite the default toolbar extension with our custom overloaded version (see extensions.js)
+        MediumEditor.extensions.toolbar = Extensions.ToolbarExt;
+
         //install our own link form extension
         options.extensions[Extensions.LinkInput.NAME] = new Extensions.LinkInput({});
 
         if (!hideToolbar) {
             var toolbarOptions = {
-                //enable the toolbar always displaying in the same location relative to the medium-editor element.
-                static: true,
-                //this enables/disables the toolbar "sticking" to the viewport and staying visible on the screen while the page scrolls.
-                sticky: true,
-                //this enables updating the state of the toolbar buttons even when the selection is collapsed (there is no selection, just a cursor)
-                updateOnEmptySelection: true,
+
+                // The set of buttons to display on the toolbar
                 buttons: toolbarButtons,
+
+                // Enable the toolbar always displaying in the same location relative to the medium-editor element.
+                // Note: the big difference between a static toolbar and a regular one, is that in the medium editor
+                // project, the toolbar is supposed to move along with the selection (and even be hidden when nothing
+                // selected). A static toolbar is a toolbar that's positioned to a element, instead of the selection.
+                static: true,
+
+                // This enables/disables the toolbar "sticking" to the viewport and staying visible on the screen while the page scrolls.
+                sticky: true,
+
+                // Only when the static option is true, this enables updating the state of the toolbar buttons
+                // even when the selection is collapsed (there is no selection, just a cursor)
+                //Note that this is what activates the toolbar in the first place when a block is clicked,
+                // because on initialization, we set the cursor (thus, an empty selection) where the user clicked and
+                // because of this flag, the toolbar is activated
+                updateOnEmptySelection: true,
+
+                // Note: only when the static option is true
                 align: 'left',
+                // diffLeft: 100,
+                // diffTop: 100,
+
+                //some custom options for better toolbar positioning
+                anchorElement: container[0],
             };
 
             if (inline) {
@@ -281,18 +303,6 @@ base.plugin("blocks.core.MediumEditor", ["blocks.core.MediumEditorExtensions", f
         options.disablePlaceholders = true;
 
         mediumEditor = new MediumEditor(element[0], options);
-
-        //when the toolbar is created and there's a difference between the container
-        //and the editor element, align them with margins (because top/left are overridden by medium editor)
-        if (!hideToolbar && container !== element) {
-            var toolbar = $(this.getToolbarElement());
-            if (toolbar) {
-                var elPos = element.offset();
-                var conPos = container.offset();
-                toolbar.css('margin-left', (conPos.left - elPos.left)+'px');
-                toolbar.css('margin-top', (conPos.top - elPos.top)+'px');
-            }
-        }
 
         return mediumEditor;
     };

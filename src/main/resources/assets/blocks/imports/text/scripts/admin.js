@@ -17,6 +17,7 @@
 base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.core.Undo", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Undo, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
 {
     var Text = this;
+    //we need to review this!
     this.TAGS = ["blocks-text div", "blocks-text span"];
 
     //inherit from property (otherwise it'll create an extra box in the sidebar)
@@ -35,8 +36,8 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         {
             Text.Class.Super.prototype.focus.call(this, block, element, hotspot, event);
 
-            // Preparation
-            element.attr("contenteditable", true);
+            // Preparation (not needed: done by medium editor?)
+            // element.attr("contenteditable", true);
 
             var inlineEditor = Commons.isInlineElement(element);
 
@@ -64,11 +65,12 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             //lastly, add the most important element, the 'legacy' one (the one that can override all previous)
             elements.push(element);
 
+            //this allows us to set some specific additional options to the elements to control how the editor behaves
+            var options = {};
             for (var i = 0; i < elements.length; i++) {
+
                 var e = elements[i];
 
-                //this allows us to set some specific additional options to the elements to control how the editor behaves
-                var options = {};
                 var optionsAttr = e.attr(TextConstants.OPTIONS_ATTR);
                 if (optionsAttr) {
                     //this converts and array to an object
@@ -91,6 +93,31 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             //note that it makes sense to pass the overlay is the container element, because it will be used to calculate
             //the position of the toolbar and we want to make it align properly to the overlay, nothing else
             var editor = Editor.getEditor(block.overlay, element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR], TextConstants.ENABLE_PASTE_HTML_CONFIG == 'true');
+
+            //MediumEditor.selection.moveCursor(document, element, 0);
+
+            // element.click();
+
+            // editor.selectElement(element[0]);
+            // element.click();
+            // MediumEditor.selection.moveCursor(document, element[0]);
+            element.focus();
+
+            var toolbar = editor.getExtensionByName('toolbar');
+            if (toolbar) {
+
+                // toolbar.showToolbar();
+                // toolbar.checkState();
+                // toolbar.showToolbar();
+
+                // var selEl = editor.getSelectedParentElement();
+                // editor.selectElement(selEl);
+                // toolbar.showToolbar();
+                // toolbar.positionToolbarIfShown();
+            }
+
+            Logger.info('DEBUGGING, DISABLE THIS!!!!!!!');
+            return;
 
             // Instead of relying on the standard placeholder functionality, we decided to implement our own:
             // The main problem is that Medium Editor activates the class medium-editor-placeholder on the editor element
