@@ -17,8 +17,20 @@
 base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.core.Undo", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Undo, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
 {
     var Text = this;
-    //we need to review this!
-    this.TAGS = ["blocks-text div", "blocks-text span"];
+
+    // This needs a bit of explanation:
+    // the commented out line used to be the tag selector array,
+    // but the problem with it is that these elements
+    // (eg. the div/span property elements in the blocks-text blocks)
+    // is that they not always get clicked on. Eg. when the user clicks
+    // in the 'stretched space' around a block, the general block registry
+    // will not find this module because the clicked element don't match the
+    // selector.
+    // Thus, we register the upper blocks-text block, and translate them
+    // to the inner property element when they come in (see _findContentElement())
+    //this.TAGS = ["blocks-text div", "blocks-text span"];
+    this.TAGS = ["blocks-text"];
+    this.CONTENT_SELECTOR = 'div[property], span[property]';
 
     //inherit from property (otherwise it'll create an extra box in the sidebar)
     (this.Class = Class.create(Property.Class, {
@@ -34,10 +46,9 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         //-----IMPLEMENTED METHODS-----
         focus: function (block, element, hotspot, event)
         {
-            Text.Class.Super.prototype.focus.call(this, block, element, hotspot, event);
+            element = this._translateContentElement(element);
 
-            // Preparation (not needed: done by medium editor?)
-            // element.attr("contenteditable", true);
+            Text.Class.Super.prototype.focus.call(this, block, element, hotspot, event);
 
             var inlineEditor = Commons.isInlineElement(element);
 
@@ -94,30 +105,12 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             //the position of the toolbar and we want to make it align properly to the overlay, nothing else
             var editor = Editor.getEditor(block.overlay, element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR], TextConstants.ENABLE_PASTE_HTML_CONFIG == 'true');
 
+            // Old code, now completely replaced by the focus() call
+            // element.click();
             //MediumEditor.selection.moveCursor(document, element, 0);
-
-            // element.click();
-
             // editor.selectElement(element[0]);
-            // element.click();
             // MediumEditor.selection.moveCursor(document, element[0]);
             element.focus();
-
-            var toolbar = editor.getExtensionByName('toolbar');
-            if (toolbar) {
-
-                // toolbar.showToolbar();
-                // toolbar.checkState();
-                // toolbar.showToolbar();
-
-                // var selEl = editor.getSelectedParentElement();
-                // editor.selectElement(selEl);
-                // toolbar.showToolbar();
-                // toolbar.positionToolbarIfShown();
-            }
-
-            Logger.info('DEBUGGING, DISABLE THIS!!!!!!!');
-            return;
 
             // Instead of relying on the standard placeholder functionality, we decided to implement our own:
             // The main problem is that Medium Editor activates the class medium-editor-placeholder on the editor element
@@ -197,7 +190,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
 
                     //make sure we're ready to type again after everything got cleared
                     element.focus();
-
                 }
                 else {
                     element.removeClass(ImportsConstants.COMMONS_EMPTY_CLASS);
@@ -273,33 +265,17 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             editor.subscribe('focus', updatePlaceholder);
             editor.subscribe('blur', updatePlaceholder);
 
-            // There are a number of issues with directly invoking some
-            // editor-element-related functions: mainly because this method is fired
-            // during 'mouseup' and the medium-editor does some initialization on 'click',
-            // more or less reverting (or messing up) the initialization we do here.
-            // That's why we chose to execute the final UI tweaks in a separate callback.
-            // var _this = this;
-            // setTimeout(function ()
-            // {
-            //     // Add custom styling to the toolbar
-            //     var toolbar = $(Editor.getToolbarElement());
-            //     if (toolbar) {
-            //         //make sure, if we click the toolbar, the block-window doesn't pop up
-            //         toolbar.attr(BlocksConstants.CLICK_ROLE_ATTR, BlocksConstants.FORCE_CLICK_ATTR_VALUE);
-            //
-            //         // toolbar.css('top', block.top + 'px');
-            //         // toolbar.css('left', block.left + 'px');
-            //
-            //         //toolbar.css('left', '100px');
-            //     }
-            //
-            //     //put the cursor where we clicked
-            //     _this._setCursor(event.clientX, event.clientY);
-            //
-            // }, 1000);
+            //position the cursor at the place in the text where we clicked
+            //note that if we end up here with a non-mouse event by accident,
+            // we don't want it to crash, so check the data
+            if (!Commons.isUnset(event.clientX) && !Commons.isUnset(event.clientY)) {
+                this._setCursor(event.clientX, event.clientY);
+            }
         },
         blur: function (block, element)
         {
+            element = this._translateContentElement(element);
+
             Text.Class.Super.prototype.blur.call(this, block, element);
 
             Editor.removeEditor(element);
@@ -307,6 +283,8 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         },
         getConfigs: function (block, element)
         {
+            element = this._translateContentElement(element);
+
             return Text.Class.Super.prototype.getConfigs.call(this, block, element);
         },
         getWindowName: function ()
@@ -315,6 +293,19 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         },
 
         //-----PRIVATE METHODS-----
+        _translateContentElement: function(blockElement)
+        {
+            var retVal = blockElement.find(Text.CONTENT_SELECTOR).first();
+
+            //this module is sometimes re-used in other modules
+            //(eg. in blocks-carousel), so if something is wrong and no sub-element
+            //is found, we just revert to the original element
+            if (retVal.length === 0) {
+                retVal = blockElement;
+            }
+
+            return retVal;
+        },
         /*
          * Puts the cursor for given coordinates
          * */

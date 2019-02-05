@@ -272,9 +272,10 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
 
                 // Only when the static option is true, this enables updating the state of the toolbar buttons
                 // even when the selection is collapsed (there is no selection, just a cursor)
-                //Note that this is what activates the toolbar in the first place when a block is clicked,
+                // Note that this is what activates the toolbar in the first place when a block is clicked,
                 // because on initialization, we set the cursor (thus, an empty selection) where the user clicked and
-                // because of this flag, the toolbar is activated
+                // because of this flag, the toolbar is activated.
+                // Update: not true anymore: now we (also) do a focus() call
                 updateOnEmptySelection: true,
 
                 // Note: only when the static option is true

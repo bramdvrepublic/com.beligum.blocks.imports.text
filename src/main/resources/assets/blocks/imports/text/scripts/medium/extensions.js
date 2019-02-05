@@ -18,7 +18,7 @@
  * Created by wouter on 8/07/15.
  */
 
-base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.core.Notification", "blocks.imports.Widget", "blocks.core.Sidebar", "base.core.Commons", "messages.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Notification, Widget, Sidebar, Commons, BlocksMessages, TextConstants, TextMessages)
+base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.core.Broadcaster", "blocks.core.Notification", "blocks.imports.Widget", "blocks.core.Sidebar", "base.core.Commons", "constants.blocks.core", "messages.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Broadcaster, Notification, Widget, Sidebar, Commons, BlocksConstants, BlocksMessages, TextConstants, TextMessages)
 {
     var MediumEditorExtensions = this;
 
@@ -137,6 +137,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             var button = $('<div class="dropdown btn-group ' + TextConstants.EDITOR_STYLES_CLASS + '"/>');
             var toggle = $('<button id="' + id + '" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Style <span class="caret"></span></button>');
 
+            //make sure all clicks on the elements in this form are permitted
+            button.attr(BlocksConstants.CLICK_ROLE_ATTR, BlocksConstants.FORCE_CLICK_ATTR_VALUE);
+
             //indicate the selected style on opening of the dropdown
             var _this = this;
             toggle.click(function (e)
@@ -176,7 +179,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     var btn = $('<a href="javascript:void(0)" ' + MediumEditorExtensions.StylesPicker.VALUE_ATTR + '="' + val.value + '">' + val.text + '</a>');
                     btn.click(btn.attr(MediumEditorExtensions.StylesPicker.VALUE_ATTR), function (event)
                     {
-                        this._onSelect(event.data);
+                        this._onSelect(event, event.data);
 
                         //close the dropdown on click, apparently this didn't work automatically...
                         $('#' + id).dropdown("toggle");
@@ -221,7 +224,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             return button;
         },
-        _onSelect: function (configValue)
+        _onSelect: function (event, configValue)
         {
             this.base.saveSelection();
 
@@ -255,6 +258,11 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             //re-positions the toolbar
             this.base.checkSelection();
+
+            // When we alter the style of a paragraph, 99% of the time, the height of the block
+            // will change, but not the entire page (eg. if the column is not completely filled),
+            // so by forcing an update, we keep a good user experience
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
         },
         _findSelectedElements: function ()
         {
@@ -384,7 +392,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         },
 
         //-----OVERLOADED FUNCTIONS-----
-        // Called when the button the toolbar is clicked
+        // Called when the button in the toolbar is clicked
         handleClick: function (event)
         {
             event.preventDefault();
@@ -433,6 +441,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         hideForm: function ()
         {
             MediumEditorExtensions.LinkInput.Super.prototype.hideForm.call(this);
+
+            // the size of the block may have changed, force an update
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
         },
 
         showForm: function (opts)
@@ -441,6 +452,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             this.setAnchorTargetAnimation(false);
 
             MediumEditorExtensions.LinkInput.Super.prototype.showForm.call(this, opts);
+
+            //make sure all clicks on the elements in this form are permitted
+            $(this.getForm()).attr(BlocksConstants.CLICK_ROLE_ATTR, BlocksConstants.FORCE_CLICK_ATTR_VALUE);
 
             //we need to call this because the parent method sets it, but doens't trigger the UI change
             $(this.getAnchorTargetCheckbox()).change();
@@ -681,6 +695,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             else {
                 MediumEditorExtensions.ButtonExt.Super.prototype.handleClick.call(this, event);
             }
+
+            // the size of the block may have changed, force an update
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
         },
     });
 
@@ -893,6 +910,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             this.base.setContent(filteredHtml);
 
             //this.base.restoreSelection();
+
+            // the size of the block may have changed, force an update
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
         },
         _filterHtml: function (html)
         {
@@ -1157,7 +1177,6 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
         //-----VARIABLES-----
         anchorElement: undefined,
-        anchorBorderWidth: undefined,
 
         //-----CONSTRUCTORS-----
         constructor: function (options)
@@ -1167,7 +1186,6 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //this is a custom element that's passed in to have more freedom regarding the positioning
             //note: this is not a jQuery element, just a regular DOM element, so we'll parse it
             this.anchorElement = $(options.anchorElement);
-            this.anchorBorderWidth = options.anchorBorderWidth ? parseFloat(options.anchorBorderWidth) : options.anchorBorderWidth;
         },
 
         //-----OVERLOADED FUNCTIONS-----
@@ -1179,17 +1197,17 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         {
             MediumEditorExtensions.ToolbarExt.Super.prototype.positionStaticToolbar.call(this, container);
 
-            //when the toolbar is created and there's a difference between the anchor
-            //and the editor element, make sure to align the two
-            var toolbarElement = this.getToolbarElement();
-            var toolbarElementQ = $(toolbarElement);
-            if (this.anchorElement && this.anchorElement !== toolbarElementQ) {
+            if (this.anchorElement) {
+
+                //when the toolbar is created and there's a difference between the anchor
+                //and the editor element, make sure to align the two
+                var toolbarElement = $(this.getToolbarElement());
 
                 var anchorPos = this.anchorElement.offset();
                 var anchorHeight = this.anchorElement.outerHeight(true);
 
                 var containerTop = anchorPos.top;
-                var toolbarHeight = toolbarElementQ.outerHeight();
+                var toolbarHeight = toolbarElement.outerHeight();
 
                 //default behavior is to just position the toolbar at the top left of the anchor
                 var top = containerTop - toolbarHeight;
@@ -1197,6 +1215,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
                 // Note that this code is basically the same (jQuery-fied and anchor-fied) version of
                 // the superclass; it doesn't do anything else, so make sure it's synchronized.
+                var stickyTop = false;
                 if (this.sticky) {
 
                     // copy/pasted from the superclass, beware of changes!
@@ -1206,27 +1225,44 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     // past the container (actually not completely past, but the slice of container that's still
                     // showing is not enough to fit the toolbar)
                     if (scrollTop > (containerTop + anchorHeight - toolbarHeight - this.stickyTopOffset)) {
-                        toolbarElementQ.removeClass('medium-editor-sticky-toolbar');
+                        toolbarElement.removeClass('medium-editor-sticky-toolbar');
                         //align the toolbar with the bottom of the container
                         top = containerTop + anchorHeight - toolbarHeight;
+                        stickyTop = true;
                     }
                     // the toolbar is above the scroll top (and therefore partly hidden), but the container
                     // is still (partly) visible: just position it at the top of the page so it 'scrolls along'
                     else if (scrollTop > (containerTop - toolbarHeight - this.stickyTopOffset)) {
-                        toolbarElementQ.addClass('medium-editor-sticky-toolbar');
+                        toolbarElement.addClass('medium-editor-sticky-toolbar');
                         top = this.stickyTopOffset;
+                        stickyTop = true;
                     }
                     // normal behavior: make sure to reset the classes we could have set above
                     else {
-                        toolbarElementQ.removeClass('medium-editor-sticky-toolbar');
+                        toolbarElement.removeClass('medium-editor-sticky-toolbar');
                     }
                 }
 
+                //don't allow a pixel gap between the toolbar and the top of the page
+                if (!stickyTop) {
+                    //strange but true: we don't need to substract if from the left value
+                    top += parseInt(BlocksConstants.FOCUSED_BLOCK_BORDER_PX);
+                }
+
                 //overwrite the top and left with our adjusted values
-                toolbarElementQ.css('top', top + 'px');
-                toolbarElementQ.css('left', left + 'px');
+                toolbarElement.css('top', top + 'px');
+                toolbarElement.css('left', left + 'px');
             }
         },
+        /**
+         * We deliberately override this method to disable hiding the toolbar at the source
+         * (eg. instead of overloading the css rules); instead, we want the toolbar to be visible at all times
+         * so it's not hidden eg. when a dialog box pops up.
+         */
+        hideToolbar: function ()
+        {
+            //NOOP
+        }
 
     });
 
