@@ -262,7 +262,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             // When we alter the style of a paragraph, 99% of the time, the height of the block
             // will change, but not the entire page (eg. if the column is not completely filled),
             // so by forcing an update, we keep a good user experience
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
         },
         _findSelectedElements: function ()
         {
@@ -443,7 +443,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             MediumEditorExtensions.LinkInput.Super.prototype.hideForm.call(this);
 
             // the size of the block may have changed, force an update
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
         },
 
         showForm: function (opts)
@@ -697,7 +697,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             }
 
             // the size of the block may have changed, force an update
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
         },
     });
 
@@ -912,7 +912,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //this.base.restoreSelection();
 
             // the size of the block may have changed, force an update
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event, {force: true});
+            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
         },
         _filterHtml: function (html)
         {
@@ -1177,6 +1177,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
         //-----VARIABLES-----
         anchorElement: undefined,
+        borderWidth: undefined,
 
         //-----CONSTRUCTORS-----
         constructor: function (options)
@@ -1186,6 +1187,10 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //this is a custom element that's passed in to have more freedom regarding the positioning
             //note: this is not a jQuery element, just a regular DOM element, so we'll parse it
             this.anchorElement = $(options.anchorElement);
+
+            //if we put a border around the focused element, it looks nicer to align the toolbar with
+            //the bottom of that border instead of the top
+            this.borderWidth = parseInt(BlocksConstants.FOCUSED_BLOCK_BORDER_PX);
         },
 
         //-----OVERLOADED FUNCTIONS-----
@@ -1246,7 +1251,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 //don't allow a pixel gap between the toolbar and the top of the page
                 if (!stickyTop) {
                     //strange but true: we don't need to substract if from the left value
-                    top += parseInt(BlocksConstants.FOCUSED_BLOCK_BORDER_PX);
+                    top += this.borderWidth;
                 }
 
                 //overwrite the top and left with our adjusted values

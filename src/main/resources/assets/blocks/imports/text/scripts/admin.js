@@ -18,19 +18,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
 {
     var Text = this;
 
-    // This needs a bit of explanation:
-    // the commented out line used to be the tag selector array,
-    // but the problem with it is that these elements
-    // (eg. the div/span property elements in the blocks-text blocks)
-    // is that they not always get clicked on. Eg. when the user clicks
-    // in the 'stretched space' around a block, the general block registry
-    // will not find this module because the clicked element don't match the
-    // selector.
-    // Thus, we register the upper blocks-text block, and translate them
-    // to the inner property element when they come in (see _findContentElement())
-    //this.TAGS = ["blocks-text div", "blocks-text span"];
-    this.TAGS = ["blocks-text"];
-    this.CONTENT_SELECTOR = 'div[property], span[property]';
+    this.TAGS = ["blocks-text [property]"];
 
     //inherit from property (otherwise it'll create an extra box in the sidebar)
     (this.Class = Class.create(Property.Class, {
@@ -46,8 +34,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         //-----IMPLEMENTED METHODS-----
         focus: function (block, element, hotspot, event)
         {
-            element = this._translateContentElement(element);
-
             Text.Class.Super.prototype.focus.call(this, block, element, hotspot, event);
 
             var inlineEditor = Commons.isInlineElement(element);
@@ -274,8 +260,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         },
         blur: function (block, element)
         {
-            element = this._translateContentElement(element);
-
             Text.Class.Super.prototype.blur.call(this, block, element);
 
             Editor.removeEditor(element);
@@ -283,8 +267,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         },
         getConfigs: function (block, element)
         {
-            element = this._translateContentElement(element);
-
             return Text.Class.Super.prototype.getConfigs.call(this, block, element);
         },
         getWindowName: function ()
@@ -293,19 +275,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
         },
 
         //-----PRIVATE METHODS-----
-        _translateContentElement: function(blockElement)
-        {
-            var retVal = blockElement.find(Text.CONTENT_SELECTOR).first();
-
-            //this module is sometimes re-used in other modules
-            //(eg. in blocks-carousel), so if something is wrong and no sub-element
-            //is found, we just revert to the original element
-            if (retVal.length === 0) {
-                retVal = blockElement;
-            }
-
-            return retVal;
-        },
         /*
          * Puts the cursor for given coordinates
          * */
