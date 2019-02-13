@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.core.Undo", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Undo, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
+base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.core.Broadcaster", "blocks.core.Undo", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Broadcaster, Undo, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
 {
     var Text = this;
 
@@ -185,6 +185,9 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             var changeStartHtml = element.html();
             var handleChange = function (e)
             {
+                //input changes usually grow/shrink the container, so force an update of the edit overlays
+                Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, e);
+
                 //don't record changes that happen _inside_ the undo event
                 if (!Undo.isInsideUndoRedo(element)) {
 

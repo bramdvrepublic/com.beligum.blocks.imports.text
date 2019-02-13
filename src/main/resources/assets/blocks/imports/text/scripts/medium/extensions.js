@@ -153,7 +153,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                     for (var i = 0; i < selectedElements.length; i++) {
                         var el = selectedElements[i];
 
-                        //contains a reference in our allTags structure
+                        //the elements contain a reference to our allTags structure, see _findSelectedElements()
                         if (el.ref) {
                             el.ref.li.addClass('active');
                         }
@@ -230,9 +230,11 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
 
             var arguments = configValue.split(':');
             var tag = arguments[0].trim().toLowerCase();
-            var clazz = arguments[1].trim();
+            var clazz = arguments.length > 0 ? arguments[1].trim() : '';
 
-            var selectedElements = this._findSelectedElements();
+            //we skip filtering to be able to 'reset' tags and/or classes that we set in the past,
+            // but we want to clean up now
+            var selectedElements = this._findSelectedElements(true);
 
             for (var i = 0; i < selectedElements.length; i++) {
                 var el = selectedElements[i].element;
@@ -262,9 +264,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             // When we alter the style of a paragraph, 99% of the time, the height of the block
             // will change, but not the entire page (eg. if the column is not completely filled),
             // so by forcing an update, we keep a good user experience
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
+            this.base.checkContentChanged();
         },
-        _findSelectedElements: function ()
+        _findSelectedElements: function (skipFiltering)
         {
             var _this = this;
             //this will contain all the elements that are currently selected, both parents and children (eg. both <a> and <p> if nested)
@@ -309,53 +311,63 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 var el = $(filtered[i]);
                 var elTag = el[0].nodeName.toLowerCase();
 
-                //We distinguish between three major cases:
-                // 1) Both class and tag match (eg. h1:red)
-                // 2) Only tag matches (eg. h1:)
-                // 3) Only class matches (eg. :red)
+                if (skipFiltering) {
+                    retVal.push({
+                        element: el,
+                        nodeName: elTag,
+                        ref: undefined
+                    });
+                }
+                else {
 
-                //1) and 2)
-                if (elTag in this.allTags) {
-                    //1) first try to find the most specific match: tag+class
-                    var addedNew = false;
-                    $.each(this.allTags[elTag], function (key, value)
-                    {
-                        if (key != '' && el.hasClass(key)) {
+                    //We distinguish between three major cases:
+                    // 1) Both class and tag match (eg. h1:red)
+                    // 2) Only tag matches (eg. h1:)
+                    // 3) Only class matches (eg. :red)
+
+                    //1) and 2)
+                    if (elTag in this.allTags) {
+                        //1) first try to find the most specific match: tag+class
+                        var addedNew = false;
+                        $.each(this.allTags[elTag], function (key, value)
+                        {
+                            if (key != '' && el.hasClass(key)) {
+                                retVal.push({
+                                    element: el,
+                                    nodeName: elTag,
+                                    ref: _this.allTags[elTag][key]
+                                });
+                                addedNew = true;
+                            }
+                        });
+
+                        //2) if no matching class was found, use the general case
+                        //note that we nee to include this match because this method is also used to return matches that will receive a new class
+                        if (!addedNew) {
                             retVal.push({
                                 element: el,
                                 nodeName: elTag,
-                                ref: _this.allTags[elTag][key]
+                                ref: this.allTags[elTag]['']
                             });
-                            addedNew = true;
                         }
-                    });
+                    }
 
-                    //2) if no matching class was found, use the general case
-                    //note that we nee to include this match because this method is also used to return matches that will receive a new class
-                    if (!addedNew) {
-                        retVal.push({
-                            element: el,
-                            nodeName: elTag,
-                            ref: this.allTags[elTag]['']
+                    //3)
+                    //Note: the empty tag is used to store all the general classes; it must be there to make sense
+                    //Also note this always need to run, because we can have multiple matches
+                    if (this.allTags['']) {
+                        //iterate over all general classes
+                        $.each(this.allTags[''], function (key, value)
+                        {
+                            if (key != '' && el.hasClass(key)) {
+                                retVal.push({
+                                    element: el,
+                                    nodeName: elTag,
+                                    ref: _this.allTags[''][key]
+                                });
+                            }
                         });
                     }
-                }
-
-                //3)
-                //Note: the empty tag is used to store all the general classes; it must be there to make sense
-                //Also note this always need to run, because we can have multiple matches
-                if (this.allTags['']) {
-                    //iterate over all general classes
-                    $.each(this.allTags[''], function (key, value)
-                    {
-                        if (key != '' && el.hasClass(key)) {
-                            retVal.push({
-                                element: el,
-                                nodeName: elTag,
-                                ref: _this.allTags[''][key]
-                            });
-                        }
-                    });
                 }
             }
 
@@ -443,7 +455,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             MediumEditorExtensions.LinkInput.Super.prototype.hideForm.call(this);
 
             // the size of the block may have changed, force an update
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
+            this.base.checkContentChanged();
         },
 
         showForm: function (opts)
@@ -697,7 +709,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             }
 
             // the size of the block may have changed, force an update
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
+            this.base.checkContentChanged();
         },
     });
 
@@ -912,7 +924,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //this.base.restoreSelection();
 
             // the size of the block may have changed, force an update
-            Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, event);
+            this.base.checkContentChanged();
         },
         _filterHtml: function (html)
         {
