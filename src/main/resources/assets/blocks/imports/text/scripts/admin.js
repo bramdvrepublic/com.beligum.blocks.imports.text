@@ -185,34 +185,29 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             var changeStartHtml = element.html();
             var handleChange = function (e)
             {
-                //don't record changes that happen _inside_ the undo event
-                if (!Undo.isInsideUndoRedo(element)) {
+                var newHtml = element.html();
+                if (!inlineEditor && newHtml.trim() === '') {
+                    newHtml = '<p><br></p>';
+                }
 
-                    var newHtml = element.html();
-                    if (!inlineEditor && newHtml.trim() == '') {
-                        newHtml = '<p><br></p>';
-                    }
+                //don't record non-changes
+                if (newHtml != changeStartHtml) {
 
-                    //don't record non-changes
-                    if (newHtml != changeStartHtml) {
+                    //note: this will also call a UI refresh when complete
+                    Broadcaster.send(Broadcaster.EVENTS.BLOCK.CHANGED.HTML, e, {
+                        surface: block,
+                        element: element,
+                        oldValue: changeStartHtml,
+                        configElement: null,
+                        configOldValue: null,
+                        configNewValue: null,
+                        listener: function (value, action, cmd)
+                        {
+                            updatePlaceholder();
+                        }
+                    });
 
-                        //note: this will also call a UI refresh when complete
-                        Broadcaster.send(Broadcaster.EVENTS.BLOCK.CHANGED.HTML, e, {
-                            surface: block,
-                            element: element,
-                            oldValue: changeStartHtml,
-                            configElement: null,
-                            configOldValue: null,
-                            configNewValue: null,
-                            listener: function (value, action, cmd)
-                            {
-                                Logger.info("updatePlaceholder");
-                                updatePlaceholder();
-                            }
-                        });
-
-                        changeStartHtml = newHtml;
-                    }
+                    changeStartHtml = newHtml;
                 }
             };
 
