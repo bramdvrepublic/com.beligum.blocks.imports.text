@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.core.Broadcaster", "blocks.core.Undo", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, Broadcaster, Undo, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
+base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blocks.core.UI", "blocks.core.Broadcaster", "blocks.imports.Property", "blocks.core.Sidebar", "blocks.core.MediumEditor", "constants.blocks.imports.commons", "constants.blocks.core", "constants.blocks.imports.text", "messages.blocks.imports.text", function (Class, Commons, UI, Broadcaster, Property, Sidebar, Editor, ImportsConstants, BlocksConstants, TextConstants, TextMessages)
 {
     var Text = this;
 
@@ -185,9 +185,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             var changeStartHtml = element.html();
             var handleChange = function (e)
             {
-                //input changes usually grow/shrink the container, so force an update of the edit overlays
-                Broadcaster.send(Broadcaster.EVENTS.PAGE.REFRESH, e);
-
                 //don't record changes that happen _inside_ the undo event
                 if (!Undo.isInsideUndoRedo(element)) {
 
@@ -199,12 +196,20 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                     //don't record non-changes
                     if (newHtml != changeStartHtml) {
 
-                        Undo.recordHtmlChange(element, changeStartHtml, null, null, null,
-                            function (value, action, cmd)
+                        //note: this will also call a UI refresh when complete
+                        Broadcaster.send(Broadcaster.EVENTS.BLOCK.CHANGED.HTML, e, {
+                            surface: block,
+                            element: element,
+                            oldValue: changeStartHtml,
+                            configElement: null,
+                            configOldValue: null,
+                            configNewValue: null,
+                            listener: function (value, action, cmd)
                             {
+                                Logger.info("updatePlaceholder");
                                 updatePlaceholder();
                             }
-                        );
+                        });
 
                         changeStartHtml = newHtml;
                     }
@@ -216,6 +221,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             //but I decided to choose the MediumEditor one for now.
             var USE_NATIVE_LISTENER = false;
             if (USE_NATIVE_LISTENER) {
+                // this is an old API and is replaced by the MutationObserver, don't use it
                 element.on("DOMSubtreeModified", handleChange);
             }
             else {
