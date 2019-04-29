@@ -16,7 +16,7 @@
 
 package com.beligum.blocks.imports.text.rdf;
 
-import com.beligum.blocks.config.InputType;
+import com.beligum.blocks.config.WidgetType;
 import com.beligum.blocks.exceptions.RdfInitializationException;
 import com.beligum.blocks.rdf.RdfFactory;
 import com.beligum.blocks.rdf.ifaces.RdfProperty;
@@ -43,7 +43,7 @@ public class Ontology extends Main
                   .isPublic(true)
                   .label(gen.com.beligum.blocks.imports.text.messages.blocks.imports.text.Entries.ontology_label_text)
                   .dataType(RDF.HTML)
-                  .widgetType(InputType.Editor);
+                  .widgetType(WidgetType.Editor);
     }
 
 

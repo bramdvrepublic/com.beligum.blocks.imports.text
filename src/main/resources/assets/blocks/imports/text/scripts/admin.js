@@ -87,7 +87,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 }
             }
 
-            //note that it makes sense to pass the overlay is the container element, because it will be used to calculate
+            //note that it makes sense to pass the overlay as the container element, because it will be used to calculate
             //the position of the toolbar and we want to make it align properly to the overlay, nothing else
             var editor = Editor.getEditor(block.overlay, element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR], TextConstants.ENABLE_PASTE_HTML_CONFIG == 'true');
 
@@ -255,10 +255,11 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             editor.subscribe('focus', updatePlaceholder);
             editor.subscribe('blur', updatePlaceholder);
 
-            //position the cursor at the place in the text where we clicked
-            //note that if we end up here with a non-mouse event by accident,
-            // we don't want it to crash, so check the data
-            if (!Commons.isUnset(event.clientX) && !Commons.isUnset(event.clientY)) {
+            // Position the cursor at the place in the text where we clicked
+            // note that if we end up here with a non-mouse event by accident,
+            // we don't want it to crash, so check the data.
+            // Also, check the event itself so we can simulate focus events with null events
+            if (!Commons.isUnset(event) && !Commons.isUnset(event.clientX) && !Commons.isUnset(event.clientY)) {
                 this._setCursor(event.clientX, event.clientY);
             }
         },

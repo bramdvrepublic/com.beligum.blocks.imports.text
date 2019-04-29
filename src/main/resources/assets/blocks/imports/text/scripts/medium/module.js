@@ -30,18 +30,6 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
     var stylePickerStyles = [];
     var toolbarOptions = {};
 
-    this.getToolbarElement = function ()
-    {
-        var retVal = null;
-        if (mediumEditor != null) {
-            var toolbarExt = mediumEditor.getExtensionByName("toolbar");
-            if (toolbarExt) {
-                retVal = toolbarExt.getToolbarElement();
-            }
-        }
-        return retVal;
-    };
-
     this.getEditor = function (container, element, inline, hideToolbar, enablePasteHtml)
     {
         if (mediumEditor != null) {
@@ -308,12 +296,40 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
         return mediumEditor;
     };
 
+    this.getActiveEditor = function ()
+    {
+        return mediumEditor;
+    };
+
     this.removeEditor = function (element)
     {
         if (mediumEditor != null) {
             mediumEditor.destroy();
         }
         mediumEditor = null;
+    };
+
+    this.getActiveToolbar = function ()
+    {
+        var retVal = null;
+
+        if (mediumEditor != null) {
+            retVal = mediumEditor.getExtensionByName("toolbar");
+        }
+
+        return retVal;
+    };
+
+    this.getToolbarElement = function ()
+    {
+        var retVal = null;
+
+        var toolbar = this.getActiveToolbar();
+        if (toolbar) {
+            retVal = toolbar.getToolbarElement();
+        }
+
+        return retVal;
     };
 
     this.setToolbarButtons = function (buttonArray)
