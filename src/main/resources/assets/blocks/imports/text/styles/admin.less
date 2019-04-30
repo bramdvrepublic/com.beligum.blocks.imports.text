@@ -103,7 +103,13 @@
 
 .medium-editor-toolbar {
   position: absolute;
-  visibility: hidden;
+
+  // We decided to always show the toolbar, whether it's active or not,
+  // since we create/destroy all editors when they're needed, it makes
+  // sense to always show it. Hope this is okay, time will tell...
+  //visibility: hidden;
+  visibility: visible;
+
   z-index: 2000;
   //these will be set in JS
   top: 0;

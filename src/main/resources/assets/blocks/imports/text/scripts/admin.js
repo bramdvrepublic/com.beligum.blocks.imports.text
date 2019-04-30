@@ -128,7 +128,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             // The rest of this is implemented in main.less
             var updatePlaceholder = function ()
             {
-                if (element.text().trim().length == 0) {
+                if (element.text().trim().length === 0) {
 
                     element.addClass(ImportsConstants.COMMONS_EMPTY_CLASS);
 
@@ -201,6 +201,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                         configElement: null,
                         configOldValue: null,
                         configNewValue: null,
+                        //this will be called on undo/redo
                         listener: function (value, action, cmd)
                         {
                             updatePlaceholder();
@@ -208,6 +209,11 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                     });
 
                     changeStartHtml = newHtml;
+
+                    // we introduced the calling of the placeholder checker here,
+                    // instead of doing it for all different commands below (now commented out)
+                    // This should improve stability a lot since we only have once entry point
+                    updatePlaceholder();
                 }
             };
 
@@ -223,37 +229,38 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 editor.subscribe('editableInput', handleChange);
             }
 
-            // See https://github.com/yabwe/medium-editor/blob/master/CUSTOM-EVENTS.md
-            // editableInput is triggered whenever the content of a contenteditable changes,
-            // including keypresses, toolbar actions, or any other user interaction that changes the html within the element.
-            // Note: don't make this 'editableInput' or it'll receive tons of events
-            //       also don't make it keydown because the editor hasn't changed on key down
-            editor.subscribe('editableKeyup', updatePlaceholder);
-            //a work around for the bug that the editor is not empty (yet) on key _down_
-            //see https://github.com/orthes/medium-editor-insert-plugin/issues/408
-            editor.subscribe('editableKeydownDelete', function (event, rawEditorElement)
-            {
-                //let's execute this a number of times in the future, so the user
-                //feels it's don't immediately, and we're sure it's done eventually
-                for (var t = 0; t <= 300; t += 100) {
-                    setTimeout(function ()
-                    {
-                        updatePlaceholder(event, rawEditorElement);
-
-                        //the toolbar seems to be lost when doing the above,
-                        //make sure that doesn't happen
-                        //TODO maybe a checkSelection(); is enough?
-                        var toolbar = editor.getExtensionByName('toolbar');
-                        if (toolbar) {
-                            $(toolbar.getToolbarElement()).addClass('medium-editor-toolbar-active');
-                        }
-
-                    }, t);
-                }
-            });
-            editor.subscribe('editablePaste', updatePlaceholder);
-            editor.subscribe('focus', updatePlaceholder);
-            editor.subscribe('blur', updatePlaceholder);
+            // ----- Old code: see comments in handleChange() for why this is commented out ------
+            // // See https://github.com/yabwe/medium-editor/blob/master/CUSTOM-EVENTS.md
+            // // editableInput is triggered whenever the content of a contenteditable changes,
+            // // including keypresses, toolbar actions, or any other user interaction that changes the html within the element.
+            // // Note: don't make this 'editableInput' or it'll receive tons of events
+            // //       also don't make it keydown because the editor hasn't changed on key down
+            // editor.subscribe('editableKeyup', updatePlaceholder);
+            // //a work around for the bug that the editor is not empty (yet) on key _down_
+            // //see https://github.com/orthes/medium-editor-insert-plugin/issues/408
+            // editor.subscribe('editableKeydownDelete', function (event, rawEditorElement)
+            // {
+            //     //let's execute this a number of times in the future, so the user
+            //     //feels it's don't immediately, and we're sure it's done eventually
+            //     for (var t = 0; t <= 300; t += 100) {
+            //         setTimeout(function ()
+            //         {
+            //             updatePlaceholder(event, rawEditorElement);
+            //
+            //             //the toolbar seems to be lost when doing the above,
+            //             //make sure that doesn't happen
+            //             //TODO maybe a checkSelection(); is enough?
+            //             var toolbar = editor.getExtensionByName('toolbar');
+            //             if (toolbar) {
+            //                 $(toolbar.getToolbarElement()).addClass('medium-editor-toolbar-active');
+            //             }
+            //
+            //         }, t);
+            //     }
+            // });
+            // editor.subscribe('editablePaste', updatePlaceholder);
+            // editor.subscribe('focus', updatePlaceholder);
+            // editor.subscribe('blur', updatePlaceholder);
 
             // Position the cursor at the place in the text where we clicked
             // note that if we end up here with a non-mouse event by accident,

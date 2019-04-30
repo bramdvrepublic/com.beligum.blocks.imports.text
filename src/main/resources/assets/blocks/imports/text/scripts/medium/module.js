@@ -332,6 +332,37 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
         return retVal;
     };
 
+    /**
+     * Selects all text of the currently active and focused editor.
+     * This is an alternative for this.getActiveEditor().selectAllContents()
+     * because that doesn't seem to always work as expected.
+     */
+    this.selectAllContents = function ()
+    {
+        var editor = this.getActiveEditor();
+
+        if (editor) {
+            var element = editor.getFocusedElement();
+
+            if (element) {
+                // See https://stackoverflow.com/questions/3805852/select-all-text-in-contenteditable-div-when-it-focus-click
+                var sel, range;
+                if (window.getSelection && document.createRange) {
+                    range = document.createRange();
+                    range.selectNodeContents(element);
+                    sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+                else if (document.body.createTextRange) {
+                    range = document.body.createTextRange();
+                    range.moveToElementText(element);
+                    range.select();
+                }
+            }
+        }
+    };
+
     this.setToolbarButtons = function (buttonArray)
     {
         toolbarOptions = buttonArray;
