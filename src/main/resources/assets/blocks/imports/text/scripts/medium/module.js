@@ -307,6 +307,10 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
             mediumEditor.destroy();
         }
         mediumEditor = null;
+
+        if (element) {
+            element.removeAttr("contenteditable");
+        }
     };
 
     this.getActiveToolbar = function ()

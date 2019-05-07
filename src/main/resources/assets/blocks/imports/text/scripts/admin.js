@@ -275,7 +275,6 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             Text.Class.Super.prototype.blur.call(this, block, element);
 
             Editor.removeEditor(element);
-            element.removeAttr("contenteditable");
         },
         getConfigs: function (block, element)
         {
