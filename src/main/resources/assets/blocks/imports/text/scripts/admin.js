@@ -269,12 +269,20 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
             if (!Commons.isUnset(event) && !Commons.isUnset(event.clientX) && !Commons.isUnset(event.clientY)) {
                 this._setCursor(event.clientX, event.clientY);
             }
+
+            // creating the editor tends to change the block a little, so make sure
+            // all other blocks on the page are synchronized
+            UI.refresh();
         },
         blur: function (block, element)
         {
             Text.Class.Super.prototype.blur.call(this, block, element);
 
             Editor.removeEditor(element);
+
+            // destroying the editor tends to change the block a little, so make sure
+            // all other blocks on the page are synchronized
+            UI.refresh();
         },
         getConfigs: function (block, element)
         {
