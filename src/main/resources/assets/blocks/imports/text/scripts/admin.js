@@ -55,7 +55,7 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
 
             //if the parent is a blocks-text, append it to the list of elements to be inspected for options
             var parent = element.parent();
-            if (parent && parent.prop('tagName') == 'BLOCKS-TEXT') {
+            if (parent && parent.prop('tagName') === 'BLOCKS-TEXT') {
                 elements.push(parent);
             }
 
