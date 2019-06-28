@@ -177,7 +177,7 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
                         //
 
                         // add the tag if it's not already there
-                        if (!(tag in acceptedRules)) {
+                        if (!acceptedRules[tag]) {
                             acceptedRules[tag] = {};
                         }
 
@@ -185,16 +185,19 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
                         if (clazz) {
                             var tagRef = acceptedRules[tag];
                             //watch out: don't overwrite possible existing values
-                            if ('class' in tagRef) {
+                            if (tagRef.attrs && tagRef.attrs['class']) {
                                 //convert to an array if not yet the case
-                                if (!$.isArray(tagRef['class'])) {
-                                    tagRef['class'] = [tagRef['class']];
+                                if (!$.isArray(tagRef.attrs['class'])) {
+                                    tagRef.attrs['class'] = [ tagRef.attrs['class'] ];
                                 }
-                                tagRef['class'].push(clazz);
+                                tagRef.attrs['class'].push(clazz);
                             }
                             else {
+                                if (!tagRef.attrs) {
+                                    tagRef.attrs = {};
+                                }
                                 //we can add the simple string, no array needed
-                                tagRef['class'] = clazz;
+                                tagRef.attrs['class'] = clazz;
                             }
                         }
                     }

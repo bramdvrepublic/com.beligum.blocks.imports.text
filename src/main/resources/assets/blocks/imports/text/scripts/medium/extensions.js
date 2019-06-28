@@ -769,7 +769,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                                 attrValues = [attrValues];
                             }
 
-                            if (tagNameLower != '*' && generalAttrs) {
+                            if (tagNameLower !== '*' && generalAttrs) {
                                 $.each(generalAttrs, function (generalStyleAttr, generalValue)
                                 {
                                     if (generalStyleAttr in attrValues) {
@@ -976,9 +976,9 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
             //We'll try to avoid creating empty blocks
             //note that we shouldn't use text() because some 'empty' elements, like <span>&nbsp;</span>
             //really do matter and have a function (like adding spacing before and after links)
-            var nodeName = el[0].nodeName;
-            var isTextNode = nodeName.indexOf('#') == 0;
-            if (isTextNode || el.html().trim() != '') {
+            var nodeName = el[0].nodeName.toLowerCase();
+            var isTextNode = nodeName.indexOf('#') === 0;
+            if (isTextNode || el.html().trim() !== '') {
 
                 var isAllowedInParent = true;
                 var parentRules = null;
@@ -1003,7 +1003,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 //note that this means free-standing text (not surrounded by an element), will be removed
                 //if nothing is set in the rules for the tag '#text'
                 //Also note that all node names in the style rules must be lowercase
-                var tagRules = this.acceptedRules[nodeName.toLowerCase()];
+                var tagRules = this.acceptedRules[nodeName];
 
                 //if we find rules for this tag, this means it's allowed,
                 //we just need to filter it's attributes
