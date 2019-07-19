@@ -973,6 +973,15 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
         {
             var retVal = null;
 
+            // We need something better to cleanup the divs
+            // if (el[0].nodeName.toLowerCase() === 'div') {
+            //     if (el.contents().length === 1) {
+            //         var child = $(el.contents()[0]);
+            //         el.unwrap();
+            //         el = child;
+            //     }
+            // }
+
             //We'll try to avoid creating empty blocks
             //note that we shouldn't use text() because some 'empty' elements, like <span>&nbsp;</span>
             //really do matter and have a function (like adding spacing before and after links)
@@ -985,7 +994,7 @@ base.plugin("blocks.core.MediumEditorExtensions", ["base.core.Class", "blocks.co
                 if (!isTextNode) {
                     var parent = el.parent();
                     //if we don't have a parent or the parent is the editor, it's always okay
-                    if (parent.length > 0 && parent[0] != this.base.elements[0]) {
+                    if (parent.length > 0 && parent[0] !== this.base.elements[0]) {
                         parentRules = this.acceptedRules[parent[0].nodeName.toLowerCase()];
                         if (parentRules && parentRules.children) {
                             if (!parentRules.children[nodeName]) {

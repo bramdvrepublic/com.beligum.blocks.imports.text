@@ -17,7 +17,7 @@
 /**
  * Created by wouter on 12/06/15.
  */
-base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.MediumEditorExtensions", function (BlocksConstants, Extensions)
+base.plugin("blocks.core.MediumEditor", ["base.core.Commons", "constants.blocks.core", "blocks.core.MediumEditorExtensions", function (Commons, BlocksConstants, Extensions)
 {
     var MediumModule = this;
 
@@ -311,8 +311,35 @@ base.plugin("blocks.core.MediumEditor", ["constants.blocks.core", "blocks.core.M
         }
         mediumEditor = null;
 
+        // Note: this is basically the same code as in mediumEditor.destroy(),
+        // but forces the cleanup of the element without the editor being active
         if (element) {
-            element.removeAttr("contenteditable");
+
+            element.removeAttr('contentEditable');
+            element.removeAttr('spellcheck');
+            element.removeAttr('role');
+            element.removeAttr('aria-multiline');
+            element.removeAttr('data-placeholder');
+
+            //first copy the attributes to remove if we don't do this it causes problems
+            //iterating over the array we're removing elements from
+            var attributes = $.map(element[0].attributes, function (item)
+            {
+                return item.name;
+            });
+            // now remove the attributes
+            $.each(attributes, function (i, attr)
+            {
+                if (attr.indexOf('medium-editor') >= 0 || attr.indexOf('data-medium') >= 0) {
+                    element.removeAttr(attr);
+                }
+            });
+
+            // remove all classes that start with 'medium-editor'
+            element.removeClass (function (index, className) {
+                return (className.match (/(^|\s)medium-editor\S+/g) || []).join(' ');
+            });
+            Commons.removeEmptyAttr(element, 'class');
         }
     };
 

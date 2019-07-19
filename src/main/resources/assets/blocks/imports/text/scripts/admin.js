@@ -87,6 +87,13 @@ base.plugin("blocks.imports.Text", ["base.core.Class", "base.core.Commons", "blo
                 }
             }
 
+            // when the editor crashes and the element is left in an unknown state, it sometimes happens
+            // that some MediumEditor attributes are left behind. Since the initialization checks for the
+            // presence of 'data-medium-editor-element' to decide whether it should be booted again or not,
+            // let's always remove this before calling the constructor below
+            Editor.removeEditor(element);
+            //element.removeAttr('data-medium-editor-element');
+
             //note that it makes sense to pass the overlay as the container element, because it will be used to calculate
             //the position of the toolbar and we want to make it align properly to the overlay, nothing else
             var editor = Editor.getEditor(block.overlay, element, inlineEditor, options[TextConstants.OPTIONS_NO_TOOLBAR], TextConstants.ENABLE_PASTE_HTML_CONFIG == 'true');
